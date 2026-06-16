@@ -1,16 +1,182 @@
-# React + Vite
+<div align="center">
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# chat-client
 
-Currently, two official plugins are available:
+### Interfaz web para un sistema de chat en tiempo real
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Frontend del sistema de chat en tiempo real desarrollado como proyecto de
+**Aplicaciones Distribuidas**. Construido con React y Vite, se conecta por
+WebSockets al backend para enviar y recibir mensajes al instante.
 
-## React Compiler
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Socket.IO](https://img.shields.io/badge/Socket.IO--client-4-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES2023-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![Railway](https://img.shields.io/badge/Railway-Deploy-0B0D0E?style=for-the-badge&logo=railway&logoColor=white)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+</div>
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Tabla de contenido
+
+<!-- - [Capturas](#capturas) -->
+- [Características](#características)
+- [Stack tecnológico](#stack-tecnológico)
+- [Arquitectura](#arquitectura)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Requisitos previos](#requisitos-previos)
+- [Instalación](#instalación)
+- [Variables de entorno](#variables-de-entorno)
+- [Ejecución](#ejecución)
+- [Build de producción](#build-de-producción)
+- [Despliegue en Railway](#despliegue-en-railway)
+- [Backend](#backend)
+
+---
+
+<!--
+## Capturas
+
+> Reemplazá estas imágenes por tus capturas reales (colócalas en `docs/screenshots/`).
+
+<div align="center">
+
+| Inicio de sesión | Registro |
+|:---:|:---:|
+| ![Login](docs/screenshots/login.png) | ![Registro](docs/screenshots/registro.png) |
+
+| Chat en tiempo real | Mensajes privados |
+|:---:|:---:|
+| ![Chat](docs/screenshots/chat.png) | ![DM](docs/screenshots/dm.png) |
+
+</div>
+
+---
+-->
+
+## Características
+
+- Pantallas de **registro** e **inicio de sesión** (autenticación con JWT).
+- **Mensajería en tiempo real** mediante WebSockets (socket.io-client).
+- **Lista de usuarios conectados** actualizada en vivo.
+- **Salas de chat múltiples**: crear, unirse y salir.
+- **Mensajes privados** (DM) entre usuarios.
+- Historial de mensajes al abrir una conversación.
+- Rutas protegidas: sin sesión válida no se accede al chat.
+
+---
+
+## Stack tecnológico
+
+| Capa | Tecnología |
+|------|------------|
+| UI | React 19 |
+| Bundler / dev server | Vite 7 |
+| Tiempo real | socket.io-client 4 |
+| Ruteo | React Router |
+| Lenguaje | JavaScript (ESM) |
+
+---
+
+## Arquitectura
+
+```
+┌─────────────────┐   HTTP (login / registro · JWT)   ┌──────────────────────┐
+│   chat-client   │ ────────────────────────────────► │     chat-server      │
+│  (este repo)    │   WebSocket (Socket.IO · JWT)      │  (Express + Socket)  │
+│                 │ ◄────────────────────────────────► │                      │
+└─────────────────┘                                    └──────────────────────┘
+```
+
+El JWT recibido al iniciar sesión se envía en el header `Authorization: Bearer`
+para las peticiones HTTP y en `auth: { token }` al abrir el socket.
+
+---
+
+## Estructura del proyecto
+
+```
+chat-client/
+├── public/                  # Estáticos
+├── src/
+│   ├── main.jsx             # Punto de entrada de React
+│   ├── App.jsx              # Componente raíz / rutas
+│   └── ...                  # Pantallas, componentes y lógica de socket
+├── docs/screenshots/        # Capturas para el README
+├── .env.example
+├── index.html
+└── vite.config.js
+```
+
+---
+
+## Requisitos previos
+
+- **Node.js** >= 20 (probado en 22) y **npm**.
+- El backend [**chat-server**](#backend) corriendo (local o en Railway).
+
+---
+
+## Instalación
+
+```bash
+git clone <url-del-repo>
+cd chat-client
+npm install
+```
+
+---
+
+## Variables de entorno
+
+Vite solo expone al cliente las variables con prefijo `VITE_`. Copiá el ejemplo:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `VITE_API_URL` | Base de la API HTTP de autenticación | `http://localhost:4000` |
+| `VITE_SOCKET_URL` | URL del servidor WebSocket | `http://localhost:4000` |
+
+> Son variables de **build-time**: al desplegar, hay que definirlas antes de buildear.
+
+---
+
+## Ejecución
+
+```bash
+npm run dev      # servidor de desarrollo en http://localhost:5173
+```
+
+---
+
+## Build de producción
+
+```bash
+npm run build    # genera la carpeta dist/
+npm run preview  # sirve el build localmente para probarlo
+```
+
+---
+
+## Despliegue en Railway
+
+1. Crear un servicio desde este repositorio en [Railway](https://railway.app).
+2. Definir `VITE_API_URL` y `VITE_SOCKET_URL` apuntando al backend desplegado.
+3. Build: `npm run build`. Servir la carpeta `dist/` (sitio estático).
+
+---
+
+## Backend
+
+El servidor que consume esta aplicación está en el repositorio
+**[chat-server](#)** (Node.js + Express + Socket.IO + Prisma + PostgreSQL).
+
+---
+
+<div align="center">
+Proyecto académico — Aplicaciones Distribuidas · Segundo parcial
+</div>
