@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/context.js';
+import PasswordInput from '../components/PasswordInput.jsx';
+import Brand from '../components/Brand.jsx';
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -26,31 +28,43 @@ export default function Login() {
 
   return (
     <div className="auth-card">
+      <Brand />
       <h1>Iniciar sesion</h1>
+      <p className="auth-subtitle">Entra para chatear en tiempo real.</p>
       <form onSubmit={handleSubmit} className="auth-form">
-        <label>
-          Email
+        <div className="auth-field">
+          <label htmlFor="email">Email</label>
           <input
+            id="email"
+            name="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
           />
-        </label>
-        <label>
-          Contraseña
-          <input
-            type="password"
+        </div>
+        <div className="auth-field">
+          <label htmlFor="password">Contraseña</label>
+          <PasswordInput
+            id="password"
+            name="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
           />
-        </label>
-        {error && <p className="auth-error">{error}</p>}
+        </div>
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
         <button type="submit" disabled={loading}>
-          {loading ? 'Entrando...' : 'Entrar'}
+          {loading ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
       <p className="auth-switch">
