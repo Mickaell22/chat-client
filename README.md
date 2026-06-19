@@ -100,9 +100,16 @@ para las peticiones HTTP y en `auth: { token }` al abrir el socket.
 chat-client/
 ├── public/                  # Estáticos
 ├── src/
-│   ├── main.jsx             # Punto de entrada de React
-│   ├── App.jsx              # Componente raíz / rutas
-│   └── ...                  # Pantallas, componentes y lógica de socket
+│   ├── main.jsx             # Punto de entrada (BrowserRouter + AuthProvider)
+│   ├── App.jsx              # Rutas (/login, /register, /chat protegida)
+│   ├── index.css            # Estilos globales + design tokens (variables CSS)
+│   ├── auth/
+│   │   ├── context.js       # AuthContext + hook useAuth
+│   │   ├── AuthContext.jsx  # AuthProvider (sesión JWT en localStorage)
+│   │   └── ProtectedRoute.jsx
+│   ├── pages/               # Login.jsx, Register.jsx, Chat.jsx
+│   ├── components/          # PasswordInput.jsx (toggle ojo), Brand.jsx
+│   └── lib/api.js           # Cliente fetch de la API de auth
 ├── docs/screenshots/        # Capturas para el README
 ├── .env.example
 ├── index.html

@@ -1,6 +1,36 @@
 :root {
-  font-family: system-ui, -apple-system, sans-serif;
-  color-scheme: light dark;
+  /* Tema fijo: definimos todos los colores para no depender del modo
+     claro/oscuro del sistema (eso era lo que rompia el contraste). */
+  color-scheme: dark;
+
+  /* Colores base: estos son los unicos valores literales. Todo lo demas
+     (rings, fondos translucidos, sombras) se deriva de ellos con color-mix,
+     asi cambiar un color base propaga a todo y no hay inconsistencias. */
+  --bg-1: #0f172a; /* slate-900 */
+  --bg-2: #1e1b4b; /* indigo-950 */
+  --card-bg: #1e293b; /* slate-800 */
+  --card-border: #334155; /* slate-700 */
+  --input-bg: #0f172a;
+  --input-border: #334155;
+  --text: #e2e8f0; /* slate-200 */
+  --text-muted: #94a3b8; /* slate-400 */
+  --accent: #6366f1; /* indigo-500 */
+  --accent-2: #8b5cf6; /* violet-500, para el gradiente de marca */
+  --accent-hover: #4f46e5; /* indigo-600 */
+  --on-accent: #f8fafc; /* texto sobre el color de acento */
+  --online: #22c55e; /* green-500, estado en linea */
+  --error: #f87171; /* red-400 */
+  --shadow-color: #000;
+
+  /* Derivados (no se editan a mano: salen de los base de arriba) */
+  --accent-ring: color-mix(in srgb, var(--accent) 25%, transparent);
+  --error-bg: color-mix(in srgb, var(--error) 12%, transparent);
+  --error-border: color-mix(in srgb, var(--error) 35%, transparent);
+  --shadow-card: 0 20px 50px
+    color-mix(in srgb, var(--shadow-color) 45%, transparent);
+
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
 }
 
 * {
@@ -11,7 +41,8 @@ body {
   margin: 0;
   min-height: 100vh;
   display: flex;
-  background: #f5f5f7;
+  color: var(--text);
+  background: radial-gradient(circle at 20% 20%, var(--bg-2), var(--bg-1) 60%);
 }
 
 #root {
@@ -19,70 +50,205 @@ body {
   display: flex;
 }
 
+a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
 /* --- Auth (login / registro) --- */
 .auth-card {
   margin: auto;
   width: 100%;
-  max-width: 360px;
-  padding: 2rem;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  max-width: 400px;
+  padding: 2.5rem 2.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+}
+
+/* Marca (signature) */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1.75rem;
+}
+
+.brand-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
+}
+
+.brand-mark svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.brand-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--online);
+  border: 2px solid var(--card-bg);
+}
+
+.brand-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
 }
 
 .auth-card h1 {
-  margin: 0 0 1.5rem;
-  font-size: 1.5rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.auth-subtitle {
+  margin: 0 0 1.9rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
-.auth-form label {
+.auth-field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.9rem;
-  font-weight: 500;
+  gap: 0.4rem;
+}
+
+.auth-field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .auth-form input {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
   font-size: 1rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.auth-form button {
-  margin-top: 0.5rem;
-  padding: 0.7rem;
+.auth-form input::placeholder {
+  color: var(--text-muted);
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* Campo de contraseña con boton de icono (mostrar/ocultar) */
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  /* deja espacio para el boton del ojo (ancho fijo: sin layout shift) */
+  padding-right: 3rem;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  border-radius: 8px;
-  background: #4f46e5;
-  color: #fff;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 0 10px 10px 0;
+  transition: color 0.15s;
+}
+
+.password-toggle:hover {
+  color: var(--text);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.password-toggle svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+/* Boton de submit (scopeado por [type=submit] para no pisar el toggle) */
+.auth-form button[type="submit"] {
+  margin-top: 0.4rem;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
 }
 
-.auth-form button:disabled {
-  opacity: 0.6;
+.auth-form button[type="submit"]:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.auth-form button[type="submit"]:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.auth-form button[type="submit"]:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .auth-error {
   margin: 0;
-  color: #c0392b;
-  font-size: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: 8px;
+  color: var(--error);
+  font-size: 0.88rem;
 }
 
 .auth-switch {
-  margin: 1.25rem 0 0;
+  margin: 1.5rem 0 0;
   text-align: center;
   font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
 /* --- Chat (placeholder) --- */
@@ -97,18 +263,46 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  background: #fff;
-  border-bottom: 1px solid #e5e5e5;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.chat-header strong {
+  color: var(--accent);
 }
 
 .chat-header button {
-  padding: 0.45rem 0.9rem;
-  border: 1px solid #ccc;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--card-border);
   border-radius: 8px;
-  background: #fff;
+  background: transparent;
+  color: var(--text);
   cursor: pointer;
+  transition: background 0.15s;
+}
+
+.chat-header button:hover {
+  background: var(--input-bg);
 }
 
 .chat-placeholder main {
   padding: 2rem 1.5rem;
+  color: var(--text-muted);
+}
+
+/* Pantallas chicas: card a ancho completo con menos padding */
+@media (max-width: 420px) {
+  .auth-card {
+    padding: 1.75rem 1.25rem;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+  }
+}
+
+/* Respeta usuarios que reducen movimiento */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }
