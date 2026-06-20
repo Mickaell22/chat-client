@@ -293,15 +293,28 @@ a:hover {
   border-bottom: 1px solid var(--card-border);
 }
 
-.chat-bar-title {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
+.chat-app {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 
-.chat-bar-title strong {
-  color: var(--accent);
-  font-size: 1.05rem;
+/* Acceso al perfil: avatar + nombre, clickeable */
+.chat-me {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.2rem 0.5rem 0.2rem 0.2rem;
+  border-radius: 999px;
+  transition: background 0.15s;
+}
+
+.chat-me:hover {
+  background: var(--input-bg);
+  text-decoration: none;
 }
 
 .chat-status {
@@ -380,30 +393,41 @@ a:hover {
   font-size: 0.9rem;
 }
 
-.chat-online li.is-me {
+.chat-online li.is-me .chat-online-name {
   color: var(--accent);
   font-weight: 600;
 }
 
-.chat-online .dot {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: var(--online);
-  flex-shrink: 0;
+.chat-online-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Area de mensajes + input */
-.chat-main {
+/* Canal: cabecera (#global) + mensajes + input, todo dentro del componente */
+.chat-channel {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 1rem 1.25rem;
 }
 
-.chat-main .verify-banner {
-  margin-bottom: 1rem;
+.channel-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.channel-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.chat-channel .verify-banner {
+  margin: 1rem 1.25rem 0;
 }
 
 .chat-messages {
@@ -411,8 +435,8 @@ a:hover {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  padding-right: 0.25rem;
+  gap: 0.4rem;
+  padding: 1rem 1.25rem;
 }
 
 .chat-empty {
@@ -421,37 +445,39 @@ a:hover {
   font-size: 0.9rem;
 }
 
+/* Mensaje estilo Discord: avatar a la izquierda + cuerpo (autor/hora/texto) */
 .msg {
-  max-width: 70%;
-  padding: 0.55rem 0.8rem;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-  align-self: flex-start;
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
 }
 
-/* Mis mensajes: alineados a la derecha y con el color de acento */
+.msg:hover {
+  background: color-mix(in srgb, var(--card-bg) 45%, transparent);
+}
+
+/* Resalto sutil de mis propios mensajes (sin alinearlos a la derecha) */
 .msg.is-mine {
-  align-self: flex-end;
-  background: color-mix(in srgb, var(--accent) 22%, var(--card-bg));
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.msg-body {
+  min-width: 0;
+  flex: 1;
 }
 
 .msg-meta {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.1rem;
 }
 
 .msg-author {
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--accent);
-}
-
-.msg.is-mine .msg-author {
-  color: var(--on-accent);
 }
 
 .msg-time {
@@ -469,7 +495,8 @@ a:hover {
 .chat-input {
   display: flex;
   gap: 0.6rem;
-  padding-top: 1rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--card-border);
 }
 
 .chat-input input {
@@ -519,6 +546,131 @@ a:hover {
   border-radius: 8px;
   color: var(--warning);
   font-size: 0.9rem;
+}
+
+/* --- Avatar (foto o iniciales) --- */
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.avatar-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+/* --- Perfil --- */
+.profile-page {
+  flex: 1;
+  display: flex;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+}
+
+.profile-card {
+  margin: auto;
+  width: 100%;
+  max-width: 440px;
+  padding: 2rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+}
+
+.profile-back {
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+}
+
+.profile-card h1 {
+  margin: 0 0 1.5rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+}
+
+.profile-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.5rem;
+}
+
+.profile-avatar button {
+  padding: 0.5rem 1.1rem;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.profile-avatar button:hover:not(:disabled) {
+  background: var(--input-bg);
+}
+
+.profile-avatar button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.profile-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.profile-fields {
+  margin: 1.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.profile-fields dt {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.profile-fields dd {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.badge-ok {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--online);
+}
+
+.badge-warn {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning);
 }
 
 /* Pantallas chicas: card a ancho completo con menos padding */

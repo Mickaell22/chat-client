@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/context.js';
 import { getSocket } from '../lib/socket.js';
+import Avatar from '../components/Avatar.jsx';
 
 export default function Chat() {
   const { user, token, signOut } = useAuth();
@@ -55,16 +57,12 @@ export default function Chat() {
   return (
     <div className="chat">
       <header className="chat-bar">
-        <div className="chat-bar-title">
-          <strong># global</strong>
-          <span className={`chat-status ${connected ? 'is-on' : ''}`}>
-            {connected ? 'conectado' : 'conectando…'}
-          </span>
-        </div>
+        <span className="chat-app">Chat en tiempo real</span>
         <div className="chat-bar-user">
-          <span>
-            Conectado como <strong>{user?.username}</strong>
-          </span>
+          <Link to="/profile" className="chat-me" title="Mi perfil">
+            <Avatar user={user} size={32} />
+            <span>{user?.username}</span>
+          </Link>
           <button type="button" onClick={signOut}>
             Cerrar sesion
           </button>
@@ -77,21 +75,31 @@ export default function Chat() {
           <ul>
             {online.map((u) => (
               <li key={u.id} className={u.id === user?.id ? 'is-me' : ''}>
-                <span className="dot" />
-                {u.username}
-                {u.id === user?.id && ' (tu)'}
+                <Avatar user={u} size={28} />
+                <span className="chat-online-name">
+                  {u.username}
+                  {u.id === user?.id && ' (tu)'}
+                </span>
               </li>
             ))}
           </ul>
         </aside>
 
-        <section className="chat-main">
+        <section className="chat-channel">
+          <header className="channel-header">
+            <span className="channel-name"># global</span>
+            <span className={`chat-status ${connected ? 'is-on' : ''}`}>
+              {connected ? 'conectado' : 'conectando…'}
+            </span>
+          </header>
+
           {user && user.emailVerified === false && (
             <p className="verify-banner" role="status">
               Tu correo aun no esta verificado. Revisa tu bandeja y abre el
               enlace que te enviamos.
             </p>
           )}
+
           <div className="chat-messages" ref={listRef}>
             {messages.length === 0 && (
               <p className="chat-empty">Aun no hay mensajes. Escribi el primero.</p>
@@ -101,16 +109,19 @@ export default function Chat() {
                 key={m.id}
                 className={`msg ${m.sender.id === user?.id ? 'is-mine' : ''}`}
               >
-                <div className="msg-meta">
-                  <span className="msg-author">{m.sender.username}</span>
-                  <span className="msg-time">
-                    {new Date(m.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
+                <Avatar user={m.sender} size={40} />
+                <div className="msg-body">
+                  <div className="msg-meta">
+                    <span className="msg-author">{m.sender.username}</span>
+                    <span className="msg-time">
+                      {new Date(m.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                  <div className="msg-content">{m.content}</div>
                 </div>
-                <div className="msg-content">{m.content}</div>
               </div>
             ))}
           </div>
@@ -120,7 +131,7 @@ export default function Chat() {
               type="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={connected ? 'Escribe un mensaje…' : 'Conectando…'}
+              placeholder={connected ? 'Escribe un mensaje en # global…' : 'Conectando…'}
               maxLength={2000}
               autoComplete="off"
             />

@@ -43,3 +43,22 @@ export function requestPasswordReset({ email }) {
 export function resetPassword({ token, password }) {
   return postJson('/api/auth/reset-password', { token, password });
 }
+
+// Sube la foto de avatar (multipart). Necesita el JWT. Devuelve { user }.
+export async function uploadAvatar({ token, file }) {
+  const body = new FormData();
+  body.append('avatar', file);
+  let res;
+  try {
+    res = await fetch(`${API_URL}/api/users/me/avatar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body, // sin Content-Type: el navegador pone el boundary del multipart
+    });
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'No se pudo subir la imagen.');
+  return data;
+}
