@@ -41,6 +41,16 @@ export function AuthProvider({ children }) {
     setSession(null);
   }, []);
 
+  // Actualiza solo el user (ej. tras cambiar el avatar), conservando el token.
+  const updateUser = useCallback((user) => {
+    setSession((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, user };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const value = {
     user: session?.user ?? null,
     token: session?.token ?? null,
@@ -48,6 +58,7 @@ export function AuthProvider({ children }) {
     signIn,
     signUp,
     signOut,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

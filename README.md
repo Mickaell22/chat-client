@@ -58,8 +58,10 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 ## Características
 
 - Pantallas de **registro** e **inicio de sesión** (autenticación con JWT).
+- **Verificación de correo** y **recuperación de contraseña** por email.
+- **Perfil de usuario** con **foto de avatar** (subida a Cloudinary).
 - **Mensajería en tiempo real** mediante WebSockets (socket.io-client).
-- **Lista de usuarios conectados** actualizada en vivo.
+- **Lista de usuarios conectados** actualizada en vivo, con avatares.
 - **Salas de chat múltiples**: crear, unirse y salir.
 - **Mensajes privados** (DM) entre usuarios.
 - Historial de mensajes al abrir una conversación.
@@ -101,7 +103,7 @@ chat-client/
 ├── public/                  # Estáticos
 ├── src/
 │   ├── main.jsx             # Punto de entrada (BrowserRouter + AuthProvider)
-│   ├── App.jsx              # Rutas (/login, /register, /chat protegida)
+│   ├── App.jsx              # Rutas (/login, /register, /chat y /profile protegidas, email)
 │   ├── index.css            # Estilos globales + design tokens (variables CSS)
 │   ├── auth/
 │   │   ├── context.js       # AuthContext + hook useAuth
