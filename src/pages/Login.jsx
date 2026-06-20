@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/context.js';
 import PasswordInput from '../components/PasswordInput.jsx';
 import Brand from '../components/Brand.jsx';
@@ -7,6 +7,8 @@ import Brand from '../components/Brand.jsx';
 export default function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  // Aviso opcional que dejan otras pantallas (ej. tras restablecer la clave).
+  const notice = useLocation().state?.notice;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -31,6 +33,11 @@ export default function Login() {
       <Brand />
       <h1>Iniciar sesion</h1>
       <p className="auth-subtitle">Entra para chatear en tiempo real.</p>
+      {notice && (
+        <p className="auth-success" role="status">
+          {notice}
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-field">
           <label htmlFor="email">Email</label>
@@ -68,6 +75,9 @@ export default function Login() {
         </button>
       </form>
       <p className="auth-switch">
+        <Link to="/forgot-password">¿Olvidaste tu contraseña?</Link>
+      </p>
+      <p className="auth-switch auth-switch-tight">
         ¿No tenes cuenta? <Link to="/register">Registrate</Link>
       </p>
     </div>

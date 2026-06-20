@@ -16,6 +16,12 @@ export default function Chat() {
         </button>
       </header>
       <main>
+        {user && user.emailVerified === false && (
+          <p className="verify-banner" role="status">
+            Tu correo aun no esta verificado. Revisa tu bandeja y abre el enlace
+            que te enviamos.
+          </p>
+        )}
         <p>Sesion iniciada. La pantalla de chat se construye en la siguiente fase.</p>
       </main>
     </div>

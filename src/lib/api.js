@@ -31,3 +31,15 @@ export function register({ username, email, password }) {
 export function login({ email, password }) {
   return postJson('/api/auth/login', { email, password });
 }
+
+export function verifyEmail({ token }) {
+  return postJson('/api/auth/verify-email', { token });
+}
+
+export function requestPasswordReset({ email }) {
+  return postJson('/api/auth/request-password-reset', { email });
+}
+
+export function resetPassword({ token, password }) {
+  return postJson('/api/auth/reset-password', { token, password });
+}

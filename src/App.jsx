@@ -3,6 +3,9 @@ import { useAuth } from './auth/context.js';
 import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
 import Chat from './pages/Chat.jsx';
 
 export default function App() {
@@ -15,6 +18,9 @@ export default function App() {
       <Route path="/" element={<Navigate to={home} replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route
         path="/chat"
         element={

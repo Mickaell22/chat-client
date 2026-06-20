@@ -18,14 +18,19 @@
   --accent-2: #8b5cf6; /* violet-500, para el gradiente de marca */
   --accent-hover: #4f46e5; /* indigo-600 */
   --on-accent: #f8fafc; /* texto sobre el color de acento */
-  --online: #22c55e; /* green-500, estado en linea */
+  --online: #22c55e; /* green-500, estado en linea / exito */
   --error: #f87171; /* red-400 */
+  --warning: #fbbf24; /* amber-400, avisos no bloqueantes */
   --shadow-color: #000;
 
   /* Derivados (no se editan a mano: salen de los base de arriba) */
   --accent-ring: color-mix(in srgb, var(--accent) 25%, transparent);
   --error-bg: color-mix(in srgb, var(--error) 12%, transparent);
   --error-border: color-mix(in srgb, var(--error) 35%, transparent);
+  --success-bg: color-mix(in srgb, var(--online) 12%, transparent);
+  --success-border: color-mix(in srgb, var(--online) 35%, transparent);
+  --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
+  --warning-border: color-mix(in srgb, var(--warning) 35%, transparent);
   --shadow-card: 0 20px 50px
     color-mix(in srgb, var(--shadow-color) 45%, transparent);
 
@@ -244,11 +249,27 @@ a:hover {
   font-size: 0.88rem;
 }
 
+/* Mensaje positivo (correo enviado, contraseña actualizada, etc.) */
+.auth-success {
+  margin: 0 0 1.1rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: 8px;
+  color: var(--online);
+  font-size: 0.88rem;
+}
+
 .auth-switch {
   margin: 1.5rem 0 0;
   text-align: center;
   font-size: 0.9rem;
   color: var(--text-muted);
+}
+
+/* Segundo enlace pegado al de arriba (ej. "olvidaste" + "registrate") */
+.auth-switch-tight {
+  margin-top: 0.5rem;
 }
 
 /* --- Chat (placeholder) --- */
@@ -288,6 +309,17 @@ a:hover {
 .chat-placeholder main {
   padding: 2rem 1.5rem;
   color: var(--text-muted);
+}
+
+/* Aviso no bloqueante de correo sin verificar */
+.verify-banner {
+  margin: 0 0 1.25rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 8px;
+  color: var(--warning);
+  font-size: 0.9rem;
 }
 
 /* Pantallas chicas: card a ancho completo con menos padding */
