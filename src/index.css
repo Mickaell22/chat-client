@@ -483,11 +483,215 @@ a:hover {
 
 /* Mensaje estilo Discord: avatar a la izquierda + cuerpo (autor/hora/texto) */
 .msg {
+  position: relative;
   display: flex;
   gap: 0.75rem;
   padding: 0.4rem 0.55rem;
   border-radius: 10px;
   animation: msg-in 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Mensaje agrupado con el anterior (mismo autor): menos aire y, en vez del
+   avatar, un hueco con la hora que aparece al pasar el mouse (estilo Discord) */
+.msg.is-grouped {
+  padding-top: 0.05rem;
+  padding-bottom: 0.05rem;
+  animation: none;
+}
+
+.msg-gutter {
+  width: 40px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding-top: 0.15rem;
+  text-align: right;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.msg:hover .msg-gutter {
+  opacity: 1;
+}
+
+/* Separador de fecha (Hoy / Ayer / fecha) entre dias distintos */
+.chat-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.7rem 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: capitalize;
+}
+
+.chat-divider::before,
+.chat-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--card-border);
+}
+
+/* Cita del mensaje al que se responde, arriba del contenido */
+.msg-reply {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--card-border);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+/* El mini avatar dentro de la cita no debe encogerse ni alinear raro */
+.msg-reply .avatar {
+  flex-shrink: 0;
+}
+
+.reply-banner-text .avatar {
+  vertical-align: middle;
+  margin-right: 0.35rem;
+}
+
+.msg-reply-author {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.msg-reply-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Barra de acciones del mensaje (responder / eliminar), flotante en hover */
+.msg-actions {
+  position: absolute;
+  top: -0.7rem;
+  right: 0.6rem;
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.15rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--shadow-color) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+
+.msg:hover .msg-actions,
+.msg:focus-within .msg-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.msg-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.msg-actions button:hover {
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+.msg-actions button[aria-label="Eliminar mensaje"]:hover {
+  color: var(--error);
+}
+
+.msg-actions button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* En pantallas tactiles no hay hover: las acciones quedan visibles inline */
+@media (hover: none) {
+  .msg-actions {
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+    align-self: center;
+    box-shadow: none;
+    background: transparent;
+    border: none;
+  }
+  .msg-actions button {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Banner "respondiendo a..." pegado arriba del input */
+.reply-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 1.35rem;
+  padding: 0.5rem 0.85rem;
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+  border: 1px solid var(--card-border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.reply-banner-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reply-banner strong {
+  color: var(--text);
+}
+
+.reply-banner-content {
+  margin-left: 0.5rem;
+  color: var(--text-muted);
+}
+
+.reply-banner button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.reply-banner button:hover {
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+.reply-banner button svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 @keyframes msg-in {
@@ -786,6 +990,123 @@ a:hover {
     border-radius: 0;
     border: none;
     box-shadow: none;
+  }
+}
+
+/* Modal de confirmacion (ej. borrar mensaje): reemplaza el alert nativo */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--shadow-color) 55%, transparent);
+  backdrop-filter: blur(2px);
+  animation: overlay-in 0.15s ease-out;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  animation: modal-in 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.modal-text {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Preview del mensaje dentro del modal: se ve igual que en el chat
+   (avatar + autor + hora + contenido), como en Discord. */
+.modal-preview {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  max-height: 9rem;
+  overflow: auto;
+}
+
+.modal-hint {
+  margin: 0 0 1.4rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.modal-hint strong {
+  color: var(--text);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.modal-actions button {
+  padding: 0.6rem 1.15rem;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s, background 0.12s, border-color 0.12s;
+}
+
+.btn-ghost {
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text);
+}
+
+.btn-ghost:hover {
+  background: var(--input-bg);
+}
+
+.btn-danger {
+  border: none;
+  background: var(--error);
+  color: var(--on-accent);
+}
+
+.btn-danger:hover {
+  filter: brightness(1.08);
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

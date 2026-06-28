@@ -1,8 +1,76 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/context.js';
 import { getSocket } from '../lib/socket.js';
 import Avatar from '../components/Avatar.jsx';
+
+// Iconos inline (Lucide, stroke). aria-hidden: cada boton lleva su aria-label.
+const svgProps = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+};
+
+function ReplyIcon() {
+  return (
+    <svg {...svgProps}>
+      <polyline points="9 14 4 9 9 4" />
+      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" x2="10" y1="11" y2="17" />
+      <line x1="14" x2="14" y1="11" y2="17" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+// Ventana para agrupar mensajes consecutivos del mismo autor (estilo Discord).
+const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+function sameDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function dateLabel(date) {
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (sameDay(date, today)) return 'Hoy';
+  if (sameDay(date, yesterday)) return 'Ayer';
+  return date.toLocaleDateString([], {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function timeLabel(date) {
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function Chat() {
   const { user, token, signOut } = useAuth();
@@ -10,8 +78,13 @@ export default function Chat() {
   const [online, setOnline] = useState([]);
   const [connected, setConnected] = useState(false);
   const [text, setText] = useState('');
+  // Mensaje al que se esta respondiendo (null = mensaje normal).
+  const [replyTo, setReplyTo] = useState(null);
+  // Mensaje pendiente de confirmar borrado (null = modal cerrado).
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const socketRef = useRef(null);
   const listRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     const socket = getSocket(token);
@@ -21,12 +94,18 @@ export default function Chat() {
     const onDisconnect = () => setConnected(false);
     const onHistory = ({ messages }) => setMessages(messages);
     const onMessage = (msg) => setMessages((prev) => [...prev, msg]);
+    const onDeleted = ({ id }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+      // Si estaba respondiendo al mensaje que se borro, cancelar la respuesta.
+      setReplyTo((r) => (r && r.id === id ? null : r));
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('users:online', setOnline);
     socket.on('room:history', onHistory);
     socket.on('room:message', onMessage);
+    socket.on('room:message:deleted', onDeleted);
 
     socket.connect();
     return () => {
@@ -35,6 +114,7 @@ export default function Chat() {
       socket.off('users:online', setOnline);
       socket.off('room:history', onHistory);
       socket.off('room:message', onMessage);
+      socket.off('room:message:deleted', onDeleted);
       socket.disconnect();
     };
   }, [token]);
@@ -50,9 +130,47 @@ export default function Chat() {
     e.preventDefault();
     const content = text.trim();
     if (!content || !connected) return;
-    socketRef.current.emit('room:message', { content });
+    socketRef.current.emit('room:message', {
+      content,
+      replyToId: replyTo?.id ?? null,
+    });
     setText('');
+    setReplyTo(null);
   }
+
+  function startReply(m) {
+    setReplyTo(m);
+    inputRef.current?.focus();
+  }
+
+  function emitDelete(id) {
+    socketRef.current.emit('room:message:delete', { id });
+  }
+
+  // Click normal abre el modal de confirmacion; Shift+click borra directo
+  // (omite la confirmacion), como Discord.
+  function handleDelete(m, e) {
+    if (e?.shiftKey) {
+      emitDelete(m.id);
+      return;
+    }
+    setConfirmDelete(m);
+  }
+
+  function doDelete() {
+    if (confirmDelete) emitDelete(confirmDelete.id);
+    setConfirmDelete(null);
+  }
+
+  // Cerrar el modal de borrado con Escape.
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setConfirmDelete(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmDelete]);
 
   return (
     <div className="chat">
@@ -108,34 +226,112 @@ export default function Chat() {
             {messages.length === 0 && (
               <p className="chat-empty">Aun no hay mensajes. Escribi el primero.</p>
             )}
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`msg ${m.sender.id === user?.id ? 'is-mine' : ''}`}
-              >
-                <Avatar user={m.sender} size={40} />
-                <div className="msg-body">
-                  <div className="msg-meta">
-                    <span className="msg-author">{m.sender.username}</span>
-                    <span className="msg-time">
-                      {new Date(m.createdAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
+            {messages.map((m, i) => {
+              const prev = messages[i - 1];
+              const date = new Date(m.createdAt);
+              const prevDate = prev ? new Date(prev.createdAt) : null;
+              const showDate = !prevDate || !sameDay(date, prevDate);
+              // Agrupa con el anterior si es del mismo autor, mismo dia, dentro
+              // de la ventana y no es una respuesta (la cita necesita cabecera).
+              const grouped =
+                !showDate &&
+                prev &&
+                prev.sender.id === m.sender.id &&
+                date - prevDate < GROUP_WINDOW_MS &&
+                !m.replyTo;
+              const mine = m.sender.id === user?.id;
+
+              return (
+                <Fragment key={m.id}>
+                  {showDate && (
+                    <div className="chat-divider">
+                      <span>{dateLabel(date)}</span>
+                    </div>
+                  )}
+                  <div
+                    className={`msg ${mine ? 'is-mine' : ''} ${
+                      grouped ? 'is-grouped' : ''
+                    }`}
+                  >
+                    {grouped ? (
+                      <span className="msg-gutter">{timeLabel(date)}</span>
+                    ) : (
+                      <Avatar user={m.sender} size={40} />
+                    )}
+                    <div className="msg-body">
+                      {m.replyTo && (
+                        <div className="msg-reply">
+                          <Avatar user={m.replyTo.sender} size={16} />
+                          <span className="msg-reply-author">
+                            {m.replyTo.sender.username}
+                          </span>
+                          <span className="msg-reply-content">
+                            {m.replyTo.content}
+                          </span>
+                        </div>
+                      )}
+                      {!grouped && (
+                        <div className="msg-meta">
+                          <span className="msg-author">{m.sender.username}</span>
+                          <span className="msg-time">{timeLabel(date)}</span>
+                        </div>
+                      )}
+                      <div className="msg-content">{m.content}</div>
+                    </div>
+                    <div className="msg-actions">
+                      <button
+                        type="button"
+                        onClick={() => startReply(m)}
+                        aria-label={`Responder a ${m.sender.username}`}
+                      >
+                        <ReplyIcon />
+                      </button>
+                      {mine && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDelete(m, e)}
+                          aria-label="Eliminar mensaje"
+                        >
+                          <TrashIcon />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="msg-content">{m.content}</div>
-                </div>
-              </div>
-            ))}
+                </Fragment>
+              );
+            })}
           </div>
+
+          {replyTo && (
+            <div className="reply-banner">
+              <span className="reply-banner-text">
+                <Avatar user={replyTo.sender} size={16} />
+                Respondiendo a <strong>{replyTo.sender.username}</strong>
+                <span className="reply-banner-content">{replyTo.content}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                aria-label="Cancelar respuesta"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          )}
 
           <form className="chat-input" onSubmit={handleSend}>
             <input
+              ref={inputRef}
               type="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={connected ? 'Escribe un mensaje en # global…' : 'Conectando…'}
+              placeholder={
+                connected
+                  ? replyTo
+                    ? `Respondiendo a ${replyTo.sender.username}…`
+                    : 'Escribe un mensaje en # global…'
+                  : 'Conectando…'
+              }
               aria-label="Mensaje para el canal global"
               maxLength={2000}
               autoComplete="off"
@@ -146,6 +342,72 @@ export default function Chat() {
           </form>
         </section>
       </div>
+
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="del-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="del-title" className="modal-title">
+              Eliminar mensaje
+            </h2>
+            <p className="modal-text">
+              ¿Realmente quieres eliminar este mensaje? Se borrara para todos y
+              no se puede deshacer.
+            </p>
+            <div className="modal-preview">
+              <Avatar user={confirmDelete.sender} size={36} />
+              <div className="msg-body">
+                {confirmDelete.replyTo && (
+                  <div className="msg-reply">
+                    <Avatar user={confirmDelete.replyTo.sender} size={16} />
+                    <span className="msg-reply-author">
+                      {confirmDelete.replyTo.sender.username}
+                    </span>
+                    <span className="msg-reply-content">
+                      {confirmDelete.replyTo.content}
+                    </span>
+                  </div>
+                )}
+                <div className="msg-meta">
+                  <span className="msg-author">
+                    {confirmDelete.sender.username}
+                  </span>
+                  <span className="msg-time">
+                    {timeLabel(new Date(confirmDelete.createdAt))}
+                  </span>
+                </div>
+                <div className="msg-content">{confirmDelete.content}</div>
+              </div>
+            </div>
+            <p className="modal-hint">
+              Tip: manten <strong>Shift</strong> al hacer clic en eliminar para
+              omitir esta confirmacion.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setConfirmDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={doDelete}
+                autoFocus
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
