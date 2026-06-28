@@ -78,6 +78,11 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 | Tiempo real | socket.io-client 4 |
 | Ruteo | React Router |
 | Lenguaje | JavaScript (ESM) |
+| Tipografía | Fraunces (Google Fonts) + system-ui |
+
+> La interfaz usa un tema oscuro neutro con design tokens (variables CSS) y la
+> tipografía **Fraunces** cargada desde Google Fonts; si no hay red, cae a una
+> serif del sistema (fallback), así que no es un requisito de build.
 
 ---
 

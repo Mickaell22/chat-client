@@ -88,7 +88,11 @@ export default function Chat() {
         <section className="chat-channel">
           <header className="channel-header">
             <span className="channel-name"># global</span>
-            <span className={`chat-status ${connected ? 'is-on' : ''}`}>
+            <span
+              className={`chat-status ${connected ? 'is-on' : ''}`}
+              role="status"
+              aria-live="polite"
+            >
               {connected ? 'conectado' : 'conectando…'}
             </span>
           </header>
@@ -132,6 +136,7 @@ export default function Chat() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={connected ? 'Escribe un mensaje en # global…' : 'Conectando…'}
+              aria-label="Mensaje para el canal global"
               maxLength={2000}
               autoComplete="off"
             />
