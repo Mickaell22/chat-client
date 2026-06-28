@@ -80,6 +80,8 @@ export default function Chat() {
   const [text, setText] = useState('');
   // Mensaje al que se esta respondiendo (null = mensaje normal).
   const [replyTo, setReplyTo] = useState(null);
+  // Mensaje pendiente de confirmar borrado (null = modal cerrado).
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const socketRef = useRef(null);
   const listRef = useRef(null);
   const inputRef = useRef(null);
@@ -141,10 +143,34 @@ export default function Chat() {
     inputRef.current?.focus();
   }
 
-  function handleDelete(m) {
-    if (!window.confirm('¿Eliminar este mensaje? No se puede deshacer.')) return;
-    socketRef.current.emit('room:message:delete', { id: m.id });
+  function emitDelete(id) {
+    socketRef.current.emit('room:message:delete', { id });
   }
+
+  // Click normal abre el modal de confirmacion; Shift+click borra directo
+  // (omite la confirmacion), como Discord.
+  function handleDelete(m, e) {
+    if (e?.shiftKey) {
+      emitDelete(m.id);
+      return;
+    }
+    setConfirmDelete(m);
+  }
+
+  function doDelete() {
+    if (confirmDelete) emitDelete(confirmDelete.id);
+    setConfirmDelete(null);
+  }
+
+  // Cerrar el modal de borrado con Escape.
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setConfirmDelete(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirmDelete]);
 
   return (
     <div className="chat">
@@ -263,7 +289,7 @@ export default function Chat() {
                       {mine && (
                         <button
                           type="button"
-                          onClick={() => handleDelete(m)}
+                          onClick={(e) => handleDelete(m, e)}
                           aria-label="Eliminar mensaje"
                         >
                           <TrashIcon />
@@ -316,6 +342,72 @@ export default function Chat() {
           </form>
         </section>
       </div>
+
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="del-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="del-title" className="modal-title">
+              Eliminar mensaje
+            </h2>
+            <p className="modal-text">
+              ¿Realmente quieres eliminar este mensaje? Se borrara para todos y
+              no se puede deshacer.
+            </p>
+            <div className="modal-preview">
+              <Avatar user={confirmDelete.sender} size={36} />
+              <div className="msg-body">
+                {confirmDelete.replyTo && (
+                  <div className="msg-reply">
+                    <Avatar user={confirmDelete.replyTo.sender} size={16} />
+                    <span className="msg-reply-author">
+                      {confirmDelete.replyTo.sender.username}
+                    </span>
+                    <span className="msg-reply-content">
+                      {confirmDelete.replyTo.content}
+                    </span>
+                  </div>
+                )}
+                <div className="msg-meta">
+                  <span className="msg-author">
+                    {confirmDelete.sender.username}
+                  </span>
+                  <span className="msg-time">
+                    {timeLabel(new Date(confirmDelete.createdAt))}
+                  </span>
+                </div>
+                <div className="msg-content">{confirmDelete.content}</div>
+              </div>
+            </div>
+            <p className="modal-hint">
+              Tip: manten <strong>Shift</strong> al hacer clic en eliminar para
+              omitir esta confirmacion.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setConfirmDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={doDelete}
+                autoFocus
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
