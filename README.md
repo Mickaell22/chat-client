@@ -59,7 +59,10 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 
 - Pantallas de **registro** e **inicio de sesión** (autenticación con JWT).
 - **Verificación de correo** y **recuperación de contraseña** por email.
-- **Perfil de usuario** con **foto de avatar** (subida a Cloudinary).
+- **Perfil de usuario** con **foto de avatar** (subida a Cloudinary), alias
+  editable, bio y color de perfil. Perfiles de otros usuarios visibles en un
+  modal de solo lectura.
+- **Estado de presencia** tipo Discord (conectado / no molestar / invisible).
 - **Mensajería en tiempo real** mediante WebSockets (socket.io-client).
 - **Lista de usuarios conectados** actualizada en vivo, con avatares.
 - **Salas de chat múltiples**: crear, unirse y salir.
