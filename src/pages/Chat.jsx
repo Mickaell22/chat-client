@@ -175,7 +175,7 @@ export default function Chat() {
   return (
     <div className="chat">
       <header className="chat-bar">
-        <span className="chat-app">Chat en tiempo real</span>
+        <span className="chat-app">pub</span>
         <div className="chat-bar-user">
           <Link to="/profile" className="chat-me" title="Mi perfil">
             <Avatar user={user} size={32} />
