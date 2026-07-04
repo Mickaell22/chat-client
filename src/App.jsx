@@ -8,6 +8,7 @@ import ResetPassword from './pages/ResetPassword.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
 import Chat from './pages/Chat.jsx';
 import Profile from './pages/Profile.jsx';
+import Friends from './pages/Friends.jsx';
 
 export default function App() {
   const { isAuthenticated } = useAuth();
@@ -27,6 +28,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Chat />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/friends"
+        element={
+          <ProtectedRoute>
+            <Friends />
           </ProtectedRoute>
         }
       />

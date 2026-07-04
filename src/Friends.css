@@ -1,0 +1,61 @@
+.tabs {
+  margin-top: 20px;
+}
+
+/* ocultar radios */
+.tabs input {
+  display: none;
+}
+
+/* botones */
+.tab-labels {
+  display: flex;
+  background: #1e1e1e;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.tab-labels label {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  color: #aaa;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.tab-labels label:hover {
+  background: #2a2a2a;
+  color: white;
+}
+
+/* panel base */
+.panel {
+  display: none;
+  margin-top: 10px;
+  padding: 15px;
+  background: #121212;
+  border-radius: 10px;
+  color: white;
+}
+
+/* lógica tabs */
+#tab1:checked ~ .tab-content .p1 {
+  display: block;
+}
+
+#tab2:checked ~ .tab-content .p2 {
+  display: block;
+}
+
+#tab3:checked ~ .tab-content .p3 {
+  display: block;
+}
+
+/* activo visual */
+#tab1:checked ~ .tab-labels label[for="tab1"],
+#tab2:checked ~ .tab-labels label[for="tab2"],
+#tab3:checked ~ .tab-labels label[for="tab3"] {
+  background: #333;
+  color: white;
+}

@@ -1,18 +1,18 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../auth/context.js';
-import { getSocket } from '../lib/socket.js';
-import Avatar from '../components/Avatar.jsx';
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../auth/context.js";
+import { getSocket } from "../lib/socket.js";
+import Avatar from "../components/Avatar.jsx";
 
 // Iconos inline (Lucide, stroke). aria-hidden: cada boton lleva su aria-label.
 const svgProps = {
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
   strokeWidth: 2,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-  'aria-hidden': true,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  "aria-hidden": true,
 };
 
 function ReplyIcon() {
@@ -44,6 +44,17 @@ function CloseIcon() {
   );
 }
 
+function FriendsIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
 // Ventana para agrupar mensajes consecutivos del mismo autor (estilo Discord).
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -59,17 +70,17 @@ function dateLabel(date) {
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
-  if (sameDay(date, today)) return 'Hoy';
-  if (sameDay(date, yesterday)) return 'Ayer';
+  if (sameDay(date, today)) return "Hoy";
+  if (sameDay(date, yesterday)) return "Ayer";
   return date.toLocaleDateString([], {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
   });
 }
 
 function timeLabel(date) {
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function Chat() {
@@ -77,7 +88,7 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [online, setOnline] = useState([]);
   const [connected, setConnected] = useState(false);
-  const [text, setText] = useState('');
+  const [text, setText] = useState("");
   // Mensaje al que se esta respondiendo (null = mensaje normal).
   const [replyTo, setReplyTo] = useState(null);
   // Mensaje pendiente de confirmar borrado (null = modal cerrado).
@@ -100,21 +111,21 @@ export default function Chat() {
       setReplyTo((r) => (r && r.id === id ? null : r));
     };
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('users:online', setOnline);
-    socket.on('room:history', onHistory);
-    socket.on('room:message', onMessage);
-    socket.on('room:message:deleted', onDeleted);
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("users:online", setOnline);
+    socket.on("room:history", onHistory);
+    socket.on("room:message", onMessage);
+    socket.on("room:message:deleted", onDeleted);
 
     socket.connect();
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('users:online', setOnline);
-      socket.off('room:history', onHistory);
-      socket.off('room:message', onMessage);
-      socket.off('room:message:deleted', onDeleted);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("users:online", setOnline);
+      socket.off("room:history", onHistory);
+      socket.off("room:message", onMessage);
+      socket.off("room:message:deleted", onDeleted);
       socket.disconnect();
     };
   }, [token]);
@@ -130,11 +141,11 @@ export default function Chat() {
     e.preventDefault();
     const content = text.trim();
     if (!content || !connected) return;
-    socketRef.current.emit('room:message', {
+    socketRef.current.emit("room:message", {
       content,
       replyToId: replyTo?.id ?? null,
     });
-    setText('');
+    setText("");
     setReplyTo(null);
   }
 
@@ -144,7 +155,7 @@ export default function Chat() {
   }
 
   function emitDelete(id) {
-    socketRef.current.emit('room:message:delete', { id });
+    socketRef.current.emit("room:message:delete", { id });
   }
 
   // Click normal abre el modal de confirmacion; Shift+click borra directo
@@ -166,10 +177,10 @@ export default function Chat() {
   useEffect(() => {
     if (!confirmDelete) return;
     const onKey = (e) => {
-      if (e.key === 'Escape') setConfirmDelete(null);
+      if (e.key === "Escape") setConfirmDelete(null);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [confirmDelete]);
 
   return (
@@ -177,6 +188,9 @@ export default function Chat() {
       <header className="chat-bar">
         <span className="chat-app">Chat en tiempo real</span>
         <div className="chat-bar-user">
+          <Link to="/friends" className="chat-me" title="Amigos">
+            Amigos
+          </Link>
           <Link to="/profile" className="chat-me" title="Mi perfil">
             <Avatar user={user} size={32} />
             <span>{user?.username}</span>
@@ -192,11 +206,11 @@ export default function Chat() {
           <h2>En linea ({online.length})</h2>
           <ul>
             {online.map((u) => (
-              <li key={u.id} className={u.id === user?.id ? 'is-me' : ''}>
+              <li key={u.id} className={u.id === user?.id ? "is-me" : ""}>
                 <Avatar user={u} size={28} />
                 <span className="chat-online-name">
                   {u.username}
-                  {u.id === user?.id && ' (tu)'}
+                  {u.id === user?.id && " (tu)"}
                 </span>
               </li>
             ))}
@@ -207,11 +221,11 @@ export default function Chat() {
           <header className="channel-header">
             <span className="channel-name"># global</span>
             <span
-              className={`chat-status ${connected ? 'is-on' : ''}`}
+              className={`chat-status ${connected ? "is-on" : ""}`}
               role="status"
               aria-live="polite"
             >
-              {connected ? 'conectado' : 'conectando…'}
+              {connected ? "conectado" : "conectando…"}
             </span>
           </header>
 
@@ -224,7 +238,9 @@ export default function Chat() {
 
           <div className="chat-messages" ref={listRef}>
             {messages.length === 0 && (
-              <p className="chat-empty">Aun no hay mensajes. Escribi el primero.</p>
+              <p className="chat-empty">
+                Aun no hay mensajes. Escribi el primero.
+              </p>
             )}
             {messages.map((m, i) => {
               const prev = messages[i - 1];
@@ -249,8 +265,8 @@ export default function Chat() {
                     </div>
                   )}
                   <div
-                    className={`msg ${mine ? 'is-mine' : ''} ${
-                      grouped ? 'is-grouped' : ''
+                    className={`msg ${mine ? "is-mine" : ""} ${
+                      grouped ? "is-grouped" : ""
                     }`}
                   >
                     {grouped ? (
@@ -272,7 +288,9 @@ export default function Chat() {
                       )}
                       {!grouped && (
                         <div className="msg-meta">
-                          <span className="msg-author">{m.sender.username}</span>
+                          <span className="msg-author">
+                            {m.sender.username}
+                          </span>
                           <span className="msg-time">{timeLabel(date)}</span>
                         </div>
                       )}
@@ -329,8 +347,8 @@ export default function Chat() {
                 connected
                   ? replyTo
                     ? `Respondiendo a ${replyTo.sender.username}…`
-                    : 'Escribe un mensaje en # global…'
-                  : 'Conectando…'
+                    : "Escribe un mensaje en # global…"
+                  : "Conectando…"
               }
               aria-label="Mensaje para el canal global"
               maxLength={2000}
