@@ -55,6 +55,17 @@ function CloseIcon() {
   );
 }
 
+function FriendsIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
 // Ventana para agrupar mensajes consecutivos del mismo autor (estilo Discord).
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -265,6 +276,9 @@ export default function Chat() {
               </ul>
             )}
           </div>
+          <Link to="/friends" className="chat-friends-link" title="Amigos" aria-label="Amigos">
+            <FriendsIcon />
+          </Link>
           <Link to="/profile" className="chat-me" title="Mi perfil">
             <Avatar user={user} size={32} />
             <span>{displayName(user)}</span>

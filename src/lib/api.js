@@ -81,6 +81,39 @@ export function getUserProfile({ token, userId }) {
   return authFetch(`/api/users/${userId}`, { token });
 }
 
+// Busca usuarios por username/alias (para agregar amigos). Devuelve [] si q < 2.
+export function searchUsers({ token, q }) {
+  return authFetch(`/api/users/search?q=${encodeURIComponent(q)}`, { token });
+}
+
+// --- Amistades ---
+// Lista de amigos aceptados:
+//   [{ id, since, friend: { id, username, alias, avatarUrl } }]
+export function friendsList({ token }) {
+  return authFetch('/api/friendships', { token });
+}
+
+// Solicitudes PENDIENTES recibidas:
+//   [{ id, since, from: { id, username, alias, avatarUrl } }]
+export function friendRequests({ token }) {
+  return authFetch('/api/friendships/requests', { token });
+}
+
+// Enviar solicitud a un usuario.
+export function sendFriendRequest({ token, friendId }) {
+  return authFetch('/api/friendships', { method: 'POST', token, body: { friendId } });
+}
+
+// Responder una solicitud recibida: state = 'ACCEPTED' | 'REJECTED'.
+export function respondFriendRequest({ token, id, state }) {
+  return authFetch(`/api/friendships/${id}`, { method: 'PATCH', token, body: { state } });
+}
+
+// Eliminar un vinculo (cancelar solicitud propia o dejar de ser amigo).
+export function removeFriendship({ token, id }) {
+  return authFetch(`/api/friendships/${id}`, { method: 'DELETE', token });
+}
+
 // Sube la foto de avatar (multipart). Necesita el JWT. Devuelve { user }.
 export async function uploadAvatar({ token, file }) {
   const body = new FormData();
