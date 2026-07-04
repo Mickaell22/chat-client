@@ -1,8 +1,19 @@
-import { Fragment, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { useAuth } from "../auth/context.js";
-import { getSocket } from "../lib/socket.js";
-import Avatar from "../components/Avatar.jsx";
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/context.js';
+import { getSocket } from '../lib/socket.js';
+import { resendVerification } from '../lib/api.js';
+import { displayName } from '../lib/displayName.js';
+import { asDotStatus } from '../lib/presence.js';
+import Avatar from '../components/Avatar.jsx';
+import Modal from '../components/Modal.jsx';
+import UserProfileModal from '../components/UserProfileModal.jsx';
+
+const STATUS_OPTIONS = [
+  { value: 'online', label: 'Conectado' },
+  { value: 'dnd', label: 'No molestar' },
+  { value: 'invisible', label: 'Desconectado' },
+];
 
 // Iconos inline (Lucide, stroke). aria-hidden: cada boton lleva su aria-label.
 const svgProps = {
@@ -93,15 +104,42 @@ export default function Chat() {
   const [replyTo, setReplyTo] = useState(null);
   // Mensaje pendiente de confirmar borrado (null = modal cerrado).
   const [confirmDelete, setConfirmDelete] = useState(null);
+  // Id del usuario cuyo perfil se esta mirando (null = modal cerrado).
+  const [viewProfileId, setViewProfileId] = useState(null);
+  const [myStatus, setMyStatus] = useState('online');
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(
+    () => Boolean(user) && localStorage.getItem(`pub.verifyBannerDismissed.${user.id}`) === '1',
+  );
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendError, setResendError] = useState('');
   const socketRef = useRef(null);
   const listRef = useRef(null);
   const inputRef = useRef(null);
+  const statusPickerRef = useRef(null);
+
+  // Cierra el menu de estado al hacer click afuera.
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+    const onClick = (e) => {
+      if (!statusPickerRef.current?.contains(e.target)) setStatusMenuOpen(false);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, [statusMenuOpen]);
 
   useEffect(() => {
     const socket = getSocket(token);
     socketRef.current = socket;
 
-    const onConnect = () => setConnected(true);
+    const onConnect = () => {
+      setConnected(true);
+      // Restaura el ultimo estado elegido (solo si no es el default 'online').
+      const saved = localStorage.getItem(`pub.status.${user.id}`);
+      if (saved && saved !== 'online') socket.emit('presence:set', { status: saved });
+      setMyStatus(saved || 'online');
+    };
     const onDisconnect = () => setConnected(false);
     const onHistory = ({ messages }) => setMessages(messages);
     const onMessage = (msg) => setMessages((prev) => [...prev, msg]);
@@ -128,7 +166,10 @@ export default function Chat() {
       socket.off("room:message:deleted", onDeleted);
       socket.disconnect();
     };
-  }, [token]);
+    // user.id es un primitivo estable para la sesion (no cambia aunque el
+    // objeto user se reemplace tras editar el perfil), asi que agregarlo no
+    // reconecta el socket de mas.
+  }, [token, user.id]);
 
   // Autoscroll: movemos solo el contenedor de mensajes (scrollTop), no la
   // pagina entera. scrollIntoView arrastraba todo el layout.
@@ -173,27 +214,74 @@ export default function Chat() {
     setConfirmDelete(null);
   }
 
-  // Cerrar el modal de borrado con Escape.
+  function changeStatus(status) {
+    setMyStatus(status);
+    setStatusMenuOpen(false);
+    localStorage.setItem(`pub.status.${user.id}`, status);
+    socketRef.current?.emit('presence:set', { status });
+  }
+
+  function dismissBanner() {
+    setBannerDismissed(true);
+    localStorage.setItem(`pub.verifyBannerDismissed.${user.id}`, '1');
+  }
+
+  async function handleResend() {
+    setResendLoading(true);
+    setResendError('');
+    try {
+      await resendVerification({ token });
+      setResendCooldown(60);
+    } catch (err) {
+      setResendError(err.message);
+      if (err.retryAfter) setResendCooldown(err.retryAfter);
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
+  // Cuenta regresiva del cooldown de reenvio (1 tick por segundo).
   useEffect(() => {
-    if (!confirmDelete) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setConfirmDelete(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [confirmDelete]);
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
 
   return (
     <div className="chat">
       <header className="chat-bar">
-        <span className="chat-app">Chat en tiempo real</span>
+        <span className="chat-app">pub</span>
         <div className="chat-bar-user">
           <Link to="/friends" className="chat-me" title="Amigos">
             Amigos
           </Link>
+          <div className="status-picker" ref={statusPickerRef}>
+            <button
+              type="button"
+              className="status-picker-trigger"
+              onClick={() => setStatusMenuOpen((o) => !o)}
+              aria-haspopup="true"
+              aria-expanded={statusMenuOpen}
+            >
+              <span className={`presence-dot is-${asDotStatus(myStatus)}`} />
+              {STATUS_OPTIONS.find((s) => s.value === myStatus)?.label}
+            </button>
+            {statusMenuOpen && (
+              <ul className="status-picker-menu">
+                {STATUS_OPTIONS.map((opt) => (
+                  <li key={opt.value}>
+                    <button type="button" onClick={() => changeStatus(opt.value)}>
+                      <span className={`presence-dot is-${asDotStatus(opt.value)}`} />
+                      {opt.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <Link to="/profile" className="chat-me" title="Mi perfil">
             <Avatar user={user} size={32} />
-            <span>{user?.username}</span>
+            <span>{displayName(user)}</span>
           </Link>
           <button type="button" onClick={signOut}>
             Cerrar sesion
@@ -205,15 +293,22 @@ export default function Chat() {
         <aside className="chat-online">
           <h2>En linea ({online.length})</h2>
           <ul>
-            {online.map((u) => (
-              <li key={u.id} className={u.id === user?.id ? "is-me" : ""}>
-                <Avatar user={u} size={28} />
-                <span className="chat-online-name">
-                  {u.username}
-                  {u.id === user?.id && " (tu)"}
-                </span>
-              </li>
-            ))}
+            {online.map((u) => {
+              const isMe = u.id === user?.id;
+              return (
+                <li
+                  key={u.id}
+                  className={isMe ? 'is-me' : 'is-clickable'}
+                  onClick={isMe ? undefined : () => setViewProfileId(u.id)}
+                >
+                  <Avatar user={u} size={28} status={asDotStatus(isMe ? myStatus : u.status)} />
+                  <span className="chat-online-name">
+                    {displayName(u)}
+                    {isMe && ' (tu)'}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </aside>
 
@@ -229,11 +324,30 @@ export default function Chat() {
             </span>
           </header>
 
-          {user && user.emailVerified === false && (
-            <p className="verify-banner" role="status">
-              Tu correo aun no esta verificado. Revisa tu bandeja y abre el
-              enlace que te enviamos.
-            </p>
+          {user && user.emailVerified === false && !bannerDismissed && (
+            <div className="verify-banner" role="status">
+              <span className="verify-banner-text">
+                Tu correo aun no esta verificado. Revisa tu bandeja y abre el
+                enlace que te enviamos.
+                {resendError && <span className="verify-banner-error"> {resendError}</span>}
+              </span>
+              <div className="verify-banner-actions">
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendLoading || resendCooldown > 0}
+                >
+                  {resendCooldown > 0
+                    ? `Reenviar (${resendCooldown}s)`
+                    : resendLoading
+                      ? 'Enviando…'
+                      : 'Reenviar correo'}
+                </button>
+                <button type="button" onClick={dismissBanner} aria-label="Cerrar aviso">
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
           )}
 
           <div className="chat-messages" ref={listRef}>
@@ -279,7 +393,7 @@ export default function Chat() {
                         <div className="msg-reply">
                           <Avatar user={m.replyTo.sender} size={16} />
                           <span className="msg-reply-author">
-                            {m.replyTo.sender.username}
+                            {displayName(m.replyTo.sender)}
                           </span>
                           <span className="msg-reply-content">
                             {m.replyTo.content}
@@ -288,8 +402,11 @@ export default function Chat() {
                       )}
                       {!grouped && (
                         <div className="msg-meta">
-                          <span className="msg-author">
-                            {m.sender.username}
+                          <span
+                            className={`msg-author ${!mine ? 'is-clickable' : ''}`}
+                            onClick={mine ? undefined : () => setViewProfileId(m.sender.id)}
+                          >
+                            {displayName(m.sender)}
                           </span>
                           <span className="msg-time">{timeLabel(date)}</span>
                         </div>
@@ -300,7 +417,7 @@ export default function Chat() {
                       <button
                         type="button"
                         onClick={() => startReply(m)}
-                        aria-label={`Responder a ${m.sender.username}`}
+                        aria-label={`Responder a ${displayName(m.sender)}`}
                       >
                         <ReplyIcon />
                       </button>
@@ -324,7 +441,7 @@ export default function Chat() {
             <div className="reply-banner">
               <span className="reply-banner-text">
                 <Avatar user={replyTo.sender} size={16} />
-                Respondiendo a <strong>{replyTo.sender.username}</strong>
+                Respondiendo a <strong>{displayName(replyTo.sender)}</strong>
                 <span className="reply-banner-content">{replyTo.content}</span>
               </span>
               <button
@@ -346,9 +463,9 @@ export default function Chat() {
               placeholder={
                 connected
                   ? replyTo
-                    ? `Respondiendo a ${replyTo.sender.username}…`
-                    : "Escribe un mensaje en # global…"
-                  : "Conectando…"
+                    ? `Respondiendo a ${displayName(replyTo.sender)}…`
+                    : 'Escribe un mensaje en # global…'
+                  : 'Conectando…'
               }
               aria-label="Mensaje para el canal global"
               maxLength={2000}
@@ -362,69 +479,70 @@ export default function Chat() {
       </div>
 
       {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-          <div
-            className="modal-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="del-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="del-title" className="modal-title">
-              Eliminar mensaje
-            </h2>
-            <p className="modal-text">
-              ¿Realmente quieres eliminar este mensaje? Se borrara para todos y
-              no se puede deshacer.
-            </p>
-            <div className="modal-preview">
-              <Avatar user={confirmDelete.sender} size={36} />
-              <div className="msg-body">
-                {confirmDelete.replyTo && (
-                  <div className="msg-reply">
-                    <Avatar user={confirmDelete.replyTo.sender} size={16} />
-                    <span className="msg-reply-author">
-                      {confirmDelete.replyTo.sender.username}
-                    </span>
-                    <span className="msg-reply-content">
-                      {confirmDelete.replyTo.content}
-                    </span>
-                  </div>
-                )}
-                <div className="msg-meta">
-                  <span className="msg-author">
-                    {confirmDelete.sender.username}
+        <Modal onClose={() => setConfirmDelete(null)} labelledBy="del-title">
+          <h2 id="del-title" className="modal-title">
+            Eliminar mensaje
+          </h2>
+          <p className="modal-text">
+            ¿Realmente quieres eliminar este mensaje? Se borrara para todos y
+            no se puede deshacer.
+          </p>
+          <div className="modal-preview">
+            <Avatar user={confirmDelete.sender} size={36} />
+            <div className="msg-body">
+              {confirmDelete.replyTo && (
+                <div className="msg-reply">
+                  <Avatar user={confirmDelete.replyTo.sender} size={16} />
+                  <span className="msg-reply-author">
+                    {displayName(confirmDelete.replyTo.sender)}
                   </span>
-                  <span className="msg-time">
-                    {timeLabel(new Date(confirmDelete.createdAt))}
+                  <span className="msg-reply-content">
+                    {confirmDelete.replyTo.content}
                   </span>
                 </div>
-                <div className="msg-content">{confirmDelete.content}</div>
+              )}
+              <div className="msg-meta">
+                <span className="msg-author">
+                  {displayName(confirmDelete.sender)}
+                </span>
+                <span className="msg-time">
+                  {timeLabel(new Date(confirmDelete.createdAt))}
+                </span>
               </div>
-            </div>
-            <p className="modal-hint">
-              Tip: manten <strong>Shift</strong> al hacer clic en eliminar para
-              omitir esta confirmacion.
-            </p>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setConfirmDelete(null)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={doDelete}
-                autoFocus
-              >
-                Eliminar
-              </button>
+              <div className="msg-content">{confirmDelete.content}</div>
             </div>
           </div>
-        </div>
+          <p className="modal-hint">
+            Tip: manten <strong>Shift</strong> al hacer clic en eliminar para
+            omitir esta confirmacion.
+          </p>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setConfirmDelete(null)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn-danger"
+              onClick={doDelete}
+              autoFocus
+            >
+              Eliminar
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {viewProfileId && (
+        <UserProfileModal
+          key={viewProfileId}
+          userId={viewProfileId}
+          token={token}
+          onClose={() => setViewProfileId(null)}
+        />
       )}
     </div>
   );

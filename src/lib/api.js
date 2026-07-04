@@ -44,6 +44,43 @@ export function resetPassword({ token, password }) {
   return postJson("/api/auth/reset-password", { token, password });
 }
 
+// Fetch autenticado generico (JSON). Igual que postJson pero con Authorization
+// y soporte de metodo/GET.
+async function authFetch(path, { method = 'GET', token, body } = {}) {
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error('No se pudo conectar con el servidor.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || 'Error inesperado del servidor.');
+    err.retryAfter = data.retryAfter;
+    throw err;
+  }
+  return data;
+}
+
+export function resendVerification({ token }) {
+  return authFetch('/api/auth/resend-verification', { method: 'POST', token });
+}
+
+export function updateProfile({ token, ...fields }) {
+  return authFetch('/api/users/me', { method: 'PATCH', token, body: fields });
+}
+
+export function getUserProfile({ token, userId }) {
+  return authFetch(`/api/users/${userId}`, { token });
+}
+
 // Sube la foto de avatar (multipart). Necesita el JWT. Devuelve { user }.
 export async function uploadAvatar({ token, file }) {
   const body = new FormData();

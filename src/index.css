@@ -367,6 +367,75 @@ a:hover {
   color: var(--text-muted);
 }
 
+/* Selector de estado tipo Discord (conectado / no molestar / desconectado) */
+.status-picker {
+  position: relative;
+}
+
+.status-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.status-picker-trigger:hover {
+  background: var(--input-bg);
+  border-color: var(--accent);
+}
+
+.status-picker-trigger .presence-dot {
+  position: static;
+  border: none;
+}
+
+.status-picker-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 20;
+  min-width: 160px;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+}
+
+.status-picker-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.status-picker-menu button:hover {
+  background: var(--input-bg);
+}
+
+.status-picker-menu .presence-dot {
+  position: static;
+  border: none;
+}
+
 .chat-bar-user strong {
   color: var(--text);
 }
@@ -425,6 +494,18 @@ a:hover {
   align-items: center;
   gap: 0.55rem;
   font-size: 0.9rem;
+  border-radius: 7px;
+}
+
+.chat-online li.is-clickable {
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  margin: 0 -0.35rem;
+  transition: background 0.12s;
+}
+
+.chat-online li.is-clickable:hover {
+  background: var(--input-bg);
 }
 
 .chat-online li.is-me .chat-online-name {
@@ -732,6 +813,14 @@ a:hover {
   color: var(--accent);
 }
 
+.msg-author.is-clickable {
+  cursor: pointer;
+}
+
+.msg-author.is-clickable:hover {
+  text-decoration: underline;
+}
+
 .msg-time {
   font-size: 0.72rem;
   color: var(--text-muted);
@@ -793,6 +882,10 @@ a:hover {
 
 /* Aviso no bloqueante de correo sin verificar */
 .verify-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin: 0 0 1.25rem;
   padding: 0.7rem 0.9rem;
   background: var(--warning-bg);
@@ -800,6 +893,58 @@ a:hover {
   border-radius: 9px;
   color: var(--warning);
   font-size: 0.9rem;
+}
+
+.verify-banner-text {
+  min-width: 0;
+}
+
+.verify-banner-error {
+  color: var(--error);
+}
+
+.verify-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.verify-banner-actions button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--warning-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--warning);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+
+.verify-banner-actions button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+}
+
+.verify-banner-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.verify-banner-actions button[aria-label='Cerrar aviso'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+}
+
+.verify-banner-actions button[aria-label='Cerrar aviso'] svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* --- Avatar (foto o iniciales) --- */
@@ -818,6 +963,34 @@ a:hover {
   font-weight: 700;
   line-height: 1;
   user-select: none;
+}
+
+/* Punto de presencia superpuesto sobre un avatar (generaliza .brand-dot). */
+.avatar-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.presence-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  border: 2px solid var(--card-bg);
+}
+
+.presence-dot.is-online {
+  background: var(--online);
+}
+
+.presence-dot.is-dnd {
+  background: var(--error);
+}
+
+.presence-dot.is-offline {
+  background: var(--text-muted);
 }
 
 /* --- Perfil --- */
@@ -856,6 +1029,21 @@ a:hover {
   font-size: 1.75rem;
   font-weight: 600;
   letter-spacing: -0.025em;
+}
+
+/* Banner detras del avatar: usa --profile-color si el usuario eligio uno,
+   si no un degrade neutro consistente con el resto de la paleta. */
+.profile-banner {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0;
+  margin-bottom: 1rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--profile-color, var(--card-border)) 35%, transparent),
+    transparent
+  );
+  border-radius: 14px;
 }
 
 .profile-avatar {
@@ -913,6 +1101,121 @@ a:hover {
 .profile-fields dd {
   margin: 0;
   font-size: 0.95rem;
+}
+
+/* Formulario de alias/bio/color de perfil */
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1.5rem 0 0;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.profile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.profile-form input[type='text'],
+.profile-form textarea {
+  padding: 0.65rem 0.8rem;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+  border-radius: 9px;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: var(--font-body);
+  resize: vertical;
+}
+
+.profile-form input[type='text']:focus,
+.profile-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.profile-char-count {
+  align-self: flex-end;
+  font-size: 0.72rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-muted);
+}
+
+.profile-swatches-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.swatch {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+}
+
+.swatch:hover {
+  transform: scale(1.08);
+}
+
+.swatch.is-selected {
+  border-color: var(--text);
+}
+
+.profile-form > button[type='submit'] {
+  align-self: flex-start;
+  padding: 0.6rem 1.3rem;
+  border: none;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--on-accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.profile-form > button[type='submit']:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.profile-form > button[type='submit']:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Linea @username · estado, usada en el modal de perfil ajeno */
+.profile-handle {
+  margin: 0 0 0.75rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 .badge {

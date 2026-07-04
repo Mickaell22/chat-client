@@ -9,7 +9,7 @@ export default function Brand() {
         </svg>
         <span className="brand-dot" />
       </span>
-      <span className="brand-name">Chat en tiempo real</span>
+      <span className="brand-name">pub</span>
     </div>
   );
 }

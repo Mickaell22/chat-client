@@ -2,9 +2,9 @@
 
 # chat-client
 
-### Interfaz web para un sistema de chat en tiempo real
+### Interfaz web de pub, un sistema de chat en tiempo real
 
-Frontend del sistema de chat en tiempo real desarrollado como proyecto de
+Frontend de **pub**, un chat en tiempo real desarrollado como proyecto de
 **Aplicaciones Distribuidas**. Construido con React y Vite, se conecta por
 WebSockets al backend para enviar y recibir mensajes al instante.
 
@@ -59,7 +59,10 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 
 - Pantallas de **registro** e **inicio de sesión** (autenticación con JWT).
 - **Verificación de correo** y **recuperación de contraseña** por email.
-- **Perfil de usuario** con **foto de avatar** (subida a Cloudinary).
+- **Perfil de usuario** con **foto de avatar** (subida a Cloudinary), alias
+  editable, bio y color de perfil. Perfiles de otros usuarios visibles en un
+  modal de solo lectura.
+- **Estado de presencia** tipo Discord (conectado / no molestar / invisible).
 - **Mensajería en tiempo real** mediante WebSockets (socket.io-client).
 - **Lista de usuarios conectados** actualizada en vivo, con avatares.
 - **Salas de chat múltiples**: crear, unirse y salir.
@@ -178,9 +181,21 @@ npm run preview  # sirve el build localmente para probarlo
 
 ## Despliegue en Railway
 
-1. Crear un servicio desde este repositorio en [Railway](https://railway.app).
-2. Definir `VITE_API_URL` y `VITE_SOCKET_URL` apuntando al backend desplegado.
-3. Build: `npm run build`. Servir la carpeta `dist/` (sitio estático).
+Desplegado en el proyecto **chat-tiempo-real**, servicio **chat-client**
+(linkeado al repo de GitHub: cada push a `main` dispara redeploy automático):
+
+**https://chat-client-production-4b10.up.railway.app**
+
+Pasos seguidos:
+
+1. Servicio `chat-client` creado con `railway add --repo <owner>/chat-client`
+   dentro del mismo proyecto Railway que el backend.
+2. `VITE_API_URL` y `VITE_SOCKET_URL` seteadas con la URL de `chat-server`
+   **antes** del build (son variables de build-time de Vite).
+3. Railway detecta automáticamente que es una app estática de Vite (`npm run
+   build` + sin script `start`) y sirve la carpeta `dist/` con Caddy — no hace
+   falta configurar un servidor propio.
+4. Dominio público generado con `railway domain`.
 
 ---
 
