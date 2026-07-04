@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/context.js';
 import { getSocket } from '../lib/socket.js';
@@ -8,6 +8,8 @@ import { asDotStatus } from '../lib/presence.js';
 import Avatar from '../components/Avatar.jsx';
 import Modal from '../components/Modal.jsx';
 import UserProfileModal from '../components/UserProfileModal.jsx';
+import CallPanel from '../components/CallPanel.jsx';
+import { useCall } from '../lib/useCall.js';
 
 const STATUS_OPTIONS = [
   { value: 'online', label: 'Conectado' },
@@ -51,6 +53,14 @@ function CloseIcon() {
     <svg {...svgProps}>
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
     </svg>
   );
 }
@@ -107,6 +117,10 @@ export default function Chat() {
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const statusPickerRef = useRef(null);
+
+  // Llamadas de voz 1-a-1 (WebRTC). Reusa el mismo socket singleton que el chat.
+  const callSocket = useMemo(() => getSocket(token), [token]);
+  const call = useCall(callSocket);
 
   // Cierra el menu de estado al hacer click afuera.
   useEffect(() => {
@@ -292,6 +306,21 @@ export default function Chat() {
                     {displayName(u)}
                     {isMe && ' (tu)'}
                   </span>
+                  {!isMe && (
+                    <button
+                      type="button"
+                      className="call-start"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        call.startCall({ id: u.id, username: displayName(u) });
+                      }}
+                      disabled={call.status !== 'idle'}
+                      aria-label={`Llamar a ${displayName(u)}`}
+                      title="Llamar"
+                    >
+                      <PhoneIcon />
+                    </button>
+                  )}
                 </li>
               );
             })}
@@ -528,6 +557,8 @@ export default function Chat() {
           onClose={() => setViewProfileId(null)}
         />
       )}
+
+      <CallPanel call={call} />
     </div>
   );
 }
