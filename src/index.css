@@ -322,6 +322,11 @@ a:hover {
   background: color-mix(in srgb, var(--card-bg) 80%, transparent);
   border-bottom: 1px solid var(--card-border);
   backdrop-filter: blur(8px);
+  /* backdrop-filter crea un stacking context propio: sin esto, el menu
+     desplegable de estado (z-index interno) queda por DEBAJO de los mensajes
+     y no se puede clickear. Elevar el header entero sobre el cuerpo del chat. */
+  position: relative;
+  z-index: 30;
 }
 
 .chat-app {
@@ -348,6 +353,28 @@ a:hover {
 .chat-me:hover {
   background: var(--input-bg);
   text-decoration: none;
+}
+
+/* Link a la pantalla de amigos (icono en la barra superior) */
+.chat-friends-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--text-muted);
+  border-radius: 999px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.chat-friends-link:hover {
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+.chat-friends-link svg {
+  width: 18px;
+  height: 18px;
 }
 
 .chat-status {
