@@ -250,7 +250,10 @@ export default function Chat() {
   return (
     <div className="chat">
       <header className="chat-bar">
-        <span className="chat-app">pub</span>
+        <span className="chat-app">
+          <img className="chat-app-mark" src="/pub-mark.png" alt="" aria-hidden="true" />
+          pub
+        </span>
         <div className="chat-bar-user">
           <div className="status-picker" ref={statusPickerRef}>
             <button

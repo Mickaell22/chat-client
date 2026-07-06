@@ -97,48 +97,17 @@ a:hover {
   box-shadow: var(--shadow-card);
 }
 
-/* Marca (signature) */
+/* Marca (signature): el cartel colgante de pub */
 .brand {
   display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  margin-bottom: 1.9rem;
-}
-
-.brand-mark {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  width: 2.4rem;
-  height: 2.4rem;
-  border-radius: 13px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: var(--on-accent);
-  box-shadow: 0 6px 18px var(--accent-glow);
+  margin-bottom: 1.6rem;
 }
 
-.brand-mark svg {
-  width: 1.3rem;
-  height: 1.3rem;
-}
-
-.brand-dot {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 50%;
-  background: var(--online);
-  border: 2px solid var(--card-bg);
-}
-
-.brand-name {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
+.brand-logo {
+  height: 7.5rem;
+  width: auto;
+  display: block;
 }
 
 .auth-card h1 {
@@ -330,11 +299,20 @@ a:hover {
 }
 
 .chat-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 1.05rem;
   letter-spacing: -0.01em;
   color: var(--text);
+}
+
+.chat-app-mark {
+  height: 1.7rem;
+  width: auto;
+  display: block;
 }
 
 /* Acceso al perfil: avatar + nombre, clickeable */
