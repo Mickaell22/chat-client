@@ -73,9 +73,21 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 - **Envío de imágenes** comprimidas en el navegador (canvas, lado máximo
   1600px) antes de subirse; opcionalmente con texto como caption.
 - Responder y eliminar mensajes (estilo Discord) en salas y DM.
-- **Llamadas de voz 1-a-1** desde un DM (WebRTC: el audio viaja P2P entre
-  navegadores; el servidor solo hace la señalización). Requiere configurar
-  `VITE_STUN_URL`; sin ella solo conecta dentro de la misma red.
+- **Llamadas de voz y videollamadas 1-a-1** desde un DM (WebRTC: el audio y
+  el video viajan P2P entre navegadores; el servidor solo hace la
+  señalización). Requiere configurar `VITE_STUN_URL`; sin ella solo conecta
+  dentro de la misma red.
+- **Canales de voz grupales por sala** (mesh P2P con tope de participantes),
+  con lista de quién está en voz y silenciar micrófono.
+- **Editar mensajes propios** (con marca "(editado)") y **reacciones con
+  emoji** (paleta cerrada, contadores en vivo).
+- **Notificaciones del navegador + sonido** al recibir un DM con la
+  conversación cerrada o la pestaña en segundo plano (activables con la
+  campana del encabezado).
+- **No leídos persistentes**: los contadores por conversación sobreviven
+  recargas y sesiones (marcas de lectura en el servidor).
+- **Scroll infinito**: el historial carga hacia atrás por páginas de 50 al
+  llegar arriba.
 - Historial de mensajes al abrir una conversación.
 - Rutas protegidas: sin sesión válida no se accede al chat.
 
