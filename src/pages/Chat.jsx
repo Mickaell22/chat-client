@@ -110,6 +110,15 @@ function PencilIcon() {
   );
 }
 
+function CameraIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />
+      <rect x="2" y="6" width="14" height="12" rx="2" />
+    </svg>
+  );
+}
+
 function BellIcon({ off }) {
   return (
     <svg {...svgProps}>
@@ -1037,21 +1046,38 @@ export default function Chat() {
               </button>
             )}
             {activeDmUser && (
-              <button
-                type="button"
-                className="channel-invite channel-call"
-                onClick={() =>
-                  call.startCall({
-                    id: activeDmUser.id,
-                    username: displayName(activeDmUser),
-                  })
-                }
-                disabled={call.status !== 'idle'}
-                aria-label={`Llamar a ${displayName(activeDmUser)}`}
-              >
-                <PhoneIcon />
-                Llamar
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="channel-invite channel-call"
+                  onClick={() =>
+                    call.startCall({
+                      id: activeDmUser.id,
+                      username: displayName(activeDmUser),
+                    })
+                  }
+                  disabled={call.status !== 'idle'}
+                  aria-label={`Llamar a ${displayName(activeDmUser)}`}
+                >
+                  <PhoneIcon />
+                  Llamar
+                </button>
+                <button
+                  type="button"
+                  className="channel-invite channel-call channel-video"
+                  onClick={() =>
+                    call.startCall(
+                      { id: activeDmUser.id, username: displayName(activeDmUser) },
+                      { video: true },
+                    )
+                  }
+                  disabled={call.status !== 'idle'}
+                  aria-label={`Videollamada con ${displayName(activeDmUser)}`}
+                >
+                  <CameraIcon />
+                  Video
+                </button>
+              </>
             )}
           </header>
 

@@ -24,6 +24,18 @@ export function useCall(socket) {
   const [peer, setPeer] = useState(null); // { id, username } del otro
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState('');
+  // 'audio' o 'video': lo fija quien llama y viaja en la invitacion.
+  const [kind, setKind] = useState('audio');
+  const [camOff, setCamOff] = useState(false);
+  // Streams expuestos para que el panel pinte los <video> en videollamadas.
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const kindRef = useRef('audio');
+
+  const setKindBoth = (k) => {
+    kindRef.current = k;
+    setKind(k);
+  };
 
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -64,18 +76,26 @@ export function useCall(socket) {
     pendingRef.current = [];
     setPeerBoth(null);
     setMuted(false);
+    setCamOff(false);
+    setLocalStream(null);
+    setRemoteStream(null);
+    setKindBoth('audio');
     setStatusBoth('idle');
   }, []);
 
   // Crea el RTCPeerConnection, pide el microfono y cablea los callbacks.
   // `peerId` es a quien se le mandan los ICE candidates.
   const createPeer = useCallback(
-    async (peerId) => {
+    async (peerId, withVideo) => {
       const pc = new RTCPeerConnection(ICE_CONFIG);
       pcRef.current = pc;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: Boolean(withVideo),
+      });
       localStreamRef.current = stream;
+      setLocalStream(stream);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
 
       pc.onicecandidate = (e) => {
@@ -84,6 +104,10 @@ export function useCall(socket) {
         }
       };
       pc.ontrack = (e) => {
+        setRemoteStream(e.streams[0]);
+        // En videollamada el sonido sale por el <video> del panel; el Audio
+        // oculto es solo para las llamadas de voz.
+        if (withVideo) return;
         if (!remoteAudioRef.current) {
           remoteAudioRef.current = new Audio();
           remoteAudioRef.current.autoplay = true;
@@ -124,12 +148,13 @@ export function useCall(socket) {
   // --- Acciones del usuario ---
 
   const startCall = useCallback(
-    (target) => {
+    (target, { video = false } = {}) => {
       if (statusRef.current !== 'idle') return;
       setError('');
+      setKindBoth(video ? 'video' : 'audio');
       setPeerBoth({ id: target.id, username: target.username });
       setStatusBoth('calling');
-      socket.emit('call:invite', { to: target.id });
+      socket.emit('call:invite', { to: target.id, video });
     },
     [socket],
   );
@@ -138,11 +163,11 @@ export function useCall(socket) {
     const p = peerRef.current;
     if (!p || statusRef.current !== 'incoming') return;
     try {
-      await createPeer(p.id);
+      await createPeer(p.id, kindRef.current === 'video');
       setStatusBoth('connecting');
       socket.emit('call:accept', { to: p.id });
     } catch {
-      setError('No se pudo acceder al microfono.');
+      setError('No se pudo acceder al microfono o la camara.');
       socket.emit('call:reject', { to: p.id });
       cleanup();
     }
@@ -160,6 +185,13 @@ export function useCall(socket) {
     cleanup();
   }, [socket, cleanup]);
 
+  const toggleCamera = useCallback(() => {
+    const track = localStreamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    setCamOff(!track.enabled);
+  }, []);
+
   const toggleMute = useCallback(() => {
     const stream = localStreamRef.current;
     if (!stream) return;
@@ -174,13 +206,14 @@ export function useCall(socket) {
   useEffect(() => {
     if (!socket) return;
 
-    const onIncoming = ({ from, username }) => {
+    const onIncoming = ({ from, username, video }) => {
       // Ya estoy en algo: respondo "ocupado" (reject) sin molestar al usuario.
       if (statusRef.current !== 'idle') {
         socket.emit('call:reject', { to: from });
         return;
       }
       setError('');
+      setKindBoth(video ? 'video' : 'audio');
       setPeerBoth({ id: from, username });
       setStatusBoth('incoming');
     };
@@ -189,13 +222,13 @@ export function useCall(socket) {
     const onAccepted = async ({ from }) => {
       if (statusRef.current !== 'calling') return;
       try {
-        const pc = await createPeer(from);
+        const pc = await createPeer(from, kindRef.current === 'video');
         setStatusBoth('connecting');
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         socket.emit('call:signal', { to: from, data: { sdp: pc.localDescription } });
       } catch {
-        setError('No se pudo acceder al microfono.');
+        setError('No se pudo acceder al microfono o la camara.');
         socket.emit('call:hangup', { to: from });
         cleanup();
       }
@@ -266,5 +299,20 @@ export function useCall(socket) {
     return () => clearTimeout(id);
   }, [error]);
 
-  return { status, peer, muted, error, startCall, acceptCall, rejectCall, hangup, toggleMute };
+  return {
+    status,
+    peer,
+    muted,
+    error,
+    kind,
+    camOff,
+    localStream,
+    remoteStream,
+    startCall,
+    acceptCall,
+    rejectCall,
+    hangup,
+    toggleMute,
+    toggleCamera,
+  };
 }
