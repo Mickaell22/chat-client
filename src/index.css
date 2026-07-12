@@ -570,9 +570,44 @@ a:hover {
 }
 
 .chat-online-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Boton de llamar: aparece al pasar el mouse sobre el usuario (en tactil queda
+   siempre visible, ver media query mas abajo). */
+.call-start {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+.call-start svg {
+  width: 15px;
+  height: 15px;
+}
+.chat-online li:hover .call-start {
+  opacity: 1;
+}
+.call-start:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--online) 18%, transparent);
+  color: var(--online);
+}
+.call-start:disabled {
+  cursor: not-allowed;
+  opacity: 0;
 }
 
 /* Canal: cabecera (#global) + mensajes + input, todo dentro del componente */
@@ -990,6 +1025,10 @@ a:hover {
     box-shadow: none;
     background: transparent;
     border: none;
+  }
+  /* En tactil no hay hover: el boton de llamar queda siempre visible. */
+  .call-start {
+    opacity: 1;
   }
   .msg-actions button {
     width: 40px;
@@ -1764,6 +1803,115 @@ a:hover {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Panel flotante de llamada de voz (experimento feat/voice-call) */
+.call-panel {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  background: var(--surface, #17171b);
+  border: 1px solid var(--border, #2a2a30);
+  box-shadow: var(--shadow-card);
+  animation: modal-in 0.16s ease-out;
+  max-width: calc(100vw - 2.5rem);
+}
+
+.call-info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.call-status {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Punto pulsante mientras suena/conecta; verde fijo en llamada. */
+.call-pulse {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: call-pulse 1.2s ease-in-out infinite;
+}
+.call-pulse.is-live {
+  background: var(--online);
+  animation: none;
+}
+
+@keyframes call-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.call-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.call-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.1s, filter 0.12s;
+}
+.call-btn svg {
+  width: 19px;
+  height: 19px;
+}
+.call-btn:hover {
+  filter: brightness(1.12);
+}
+.call-btn:active {
+  transform: scale(0.94);
+}
+
+.call-accept {
+  background: var(--online);
+  color: #06240f;
+}
+.call-hangup {
+  background: var(--error);
+}
+.call-mute {
+  background: var(--input-bg, #26262c);
+  color: var(--text);
+}
+.call-mute.is-muted {
+  background: color-mix(in srgb, var(--error) 22%, transparent);
+  color: var(--error);
+}
+
+.call-error {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--error);
+}
+
+@media (max-width: 480px) {
+  .call-panel {
+    left: 1.25rem;
+    right: 1.25rem;
+    justify-content: space-between;
   }
 }
 
