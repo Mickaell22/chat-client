@@ -603,6 +603,23 @@ a:hover {
   margin: 1rem 1.35rem 0;
 }
 
+/* Indicador de "escribiendo": flota sobre el input para no mover el layout */
+.chat-input-area {
+  position: relative;
+}
+
+.typing-indicator {
+  position: absolute;
+  bottom: 100%;
+  left: 1.35rem;
+  right: 1.35rem;
+  padding: 0.2rem 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  background: linear-gradient(to top, var(--bg-1), transparent);
+}
+
 /* Boton "Invitar" de la cabecera de una sala */
 .channel-invite {
   margin-left: auto;
