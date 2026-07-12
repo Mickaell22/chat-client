@@ -1963,3 +1963,16 @@ a:hover {
   width: 18px;
   height: 18px;
 }
+
+/* Marca de mensaje editado, discreta junto a la hora o al final del texto */
+.msg-edited {
+  margin-left: 0.35rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.reply-banner-text svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
