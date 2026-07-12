@@ -90,6 +90,14 @@ function ImageIcon() {
   );
 }
 
+function PencilIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+    </svg>
+  );
+}
+
 function BellIcon({ off }) {
   return (
     <svg {...svgProps}>
@@ -189,6 +197,8 @@ export default function Chat() {
   const [text, setText] = useState('');
   // Mensaje al que se esta respondiendo (null = mensaje normal).
   const [replyTo, setReplyTo] = useState(null);
+  // Mensaje propio en edicion (null = no se esta editando).
+  const [editing, setEditing] = useState(null);
   // Mensaje pendiente de confirmar borrado (null = modal cerrado).
   const [confirmDelete, setConfirmDelete] = useState(null);
   // Id del usuario cuyo perfil se esta mirando (null = modal cerrado).
@@ -382,6 +392,17 @@ export default function Chat() {
         });
       }
     };
+    // Edicion (de sala o DM): se actualiza el mensaje este donde este.
+    const onEdited = ({ id, content, editedAt }) => {
+      setBuckets((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([k, list]) => [
+            k,
+            list.map((m) => (m.id === id ? { ...m, content, editedAt } : m)),
+          ]),
+        ),
+      );
+    };
     // Borrado (de sala o DM): se quita de todos los buckets, es mas simple
     // que averiguar en cual vive.
     const onDeleted = ({ id }) => {
@@ -403,6 +424,8 @@ export default function Chat() {
     socket.on('dm:conversations', setConvos);
     socket.on('dm:message', onDm);
     socket.on('dm:message:deleted', onDeleted);
+    socket.on('room:message:edited', onEdited);
+    socket.on('dm:message:edited', onEdited);
     socket.on('rooms:list', setRooms);
     socket.on('room:created', onRoomCreated);
     socket.on('typing:start', onTypingStart);
@@ -419,6 +442,8 @@ export default function Chat() {
       socket.off('dm:conversations', setConvos);
       socket.off('dm:message', onDm);
       socket.off('dm:message:deleted', onDeleted);
+      socket.off('room:message:edited', onEdited);
+      socket.off('dm:message:edited', onEdited);
       socket.off('rooms:list', setRooms);
       socket.off('room:created', onRoomCreated);
       socket.off('typing:start', onTypingStart);
@@ -470,6 +495,16 @@ export default function Chat() {
     const content = text.trim();
     if (!content || !connected) return;
     stopTyping();
+    // Editando: se emite la edicion y listo (no es un mensaje nuevo).
+    if (editing) {
+      socketRef.current.emit(
+        editing.recipientId ? 'dm:message:edit' : 'room:message:edit',
+        { id: editing.id, content },
+      );
+      setEditing(null);
+      setText('');
+      return;
+    }
     const payload = { content, replyToId: replyTo?.id ?? null };
     if (activeDmUser) {
       socketRef.current.emit('dm:message', { ...payload, toUserId: activeDmUser.id });
@@ -530,6 +565,8 @@ export default function Chat() {
     stopTyping();
     setActiveKey(key);
     setReplyTo(null);
+    setEditing(null);
+    setText((t) => (editing ? '' : t));
     setUnread((prev) => ({ ...prev, [key]: 0 }));
     inputRef.current?.focus();
   }
@@ -638,7 +675,21 @@ export default function Chat() {
 
   function startReply(m) {
     setReplyTo(m);
+    setEditing(null);
     inputRef.current?.focus();
+  }
+
+  // Editar carga el contenido en el MISMO input del chat (como el reply).
+  function startEdit(m) {
+    setEditing(m);
+    setReplyTo(null);
+    setText(m.content);
+    inputRef.current?.focus();
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setText('');
   }
 
   // Un mensaje con recipientId es un DM: se borra por el evento de DM.
@@ -974,6 +1025,7 @@ export default function Chat() {
                             {displayName(m.sender)}
                           </span>
                           <span className="msg-time">{timeLabel(date)}</span>
+                          {m.editedAt && <span className="msg-edited">(editado)</span>}
                         </div>
                       )}
                       {m.imageUrl && (
@@ -1007,7 +1059,14 @@ export default function Chat() {
                           </button>
                         </div>
                       ) : (
-                        m.content && <div className="msg-content">{m.content}</div>
+                        m.content && (
+                          <div className="msg-content">
+                            {m.content}
+                            {grouped && m.editedAt && (
+                              <span className="msg-edited">(editado)</span>
+                            )}
+                          </div>
+                        )
                       )}
                     </div>
                     <div className="msg-actions">
@@ -1018,6 +1077,15 @@ export default function Chat() {
                       >
                         <ReplyIcon />
                       </button>
+                      {mine && !invite && (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(m)}
+                          aria-label="Editar mensaje"
+                        >
+                          <PencilIcon />
+                        </button>
+                      )}
                       {mine && (
                         <button
                           type="button"
@@ -1033,6 +1101,19 @@ export default function Chat() {
               );
             })}
           </div>
+
+          {editing && (
+            <div className="reply-banner">
+              <span className="reply-banner-text">
+                <PencilIcon />
+                Editando mensaje
+                <span className="reply-banner-content">{editing.content}</span>
+              </span>
+              <button type="button" onClick={cancelEdit} aria-label="Cancelar edicion">
+                <CloseIcon />
+              </button>
+            </div>
+          )}
 
           {replyTo && (
             <div className="reply-banner">
@@ -1099,7 +1180,9 @@ export default function Chat() {
               }}
               placeholder={
                 connected
-                  ? replyTo
+                  ? editing
+                    ? 'Edita tu mensaje…'
+                    : replyTo
                     ? `Respondiendo a ${displayName(replyTo.sender)}…`
                     : activeDmUser
                       ? `Escribe un mensaje para ${displayName(activeDmUser)}…`
