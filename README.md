@@ -8,7 +8,7 @@ Frontend de **pub**, un chat en tiempo real desarrollado como proyecto de
 **Aplicaciones Distribuidas**. Construido con React y Vite, se conecta por
 WebSockets al backend para enviar y recibir mensajes al instante.
 
-![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO--client-4-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2023-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
@@ -63,6 +63,8 @@ WebSockets al backend para enviar y recibir mensajes al instante.
   editable, bio y color de perfil. Perfiles de otros usuarios visibles en un
   modal de solo lectura.
 - **Estado de presencia** tipo Discord (conectado / no molestar / invisible).
+- **Amistades**: buscar usuarios, enviar/aceptar solicitudes (también desde el
+  modal de perfil), y ver salas y amigos en común de cada usuario.
 - **Mensajería en tiempo real** mediante WebSockets (socket.io-client).
 - **Lista de usuarios conectados** actualizada en vivo, con avatares.
 - **Salas de chat múltiples**: crear, unirse y salir, con salas **privadas**
@@ -138,9 +140,10 @@ chat-client/
 │   │   ├── context.js       # AuthContext + hook useAuth
 │   │   ├── AuthContext.jsx  # AuthProvider (sesión JWT en localStorage)
 │   │   └── ProtectedRoute.jsx
-│   ├── pages/               # Login.jsx, Register.jsx, Chat.jsx
-│   ├── components/          # PasswordInput.jsx (toggle ojo), Brand.jsx
-│   └── lib/api.js           # Cliente fetch de la API de auth
+│   ├── pages/               # Login, Register, Chat, Profile, Friends, email...
+│   ├── components/          # Avatar, Modal, CallPanel, RoomsModal, InviteModal...
+│   └── lib/                 # api.js, socket.js, useCall, useVoiceRoom,
+│                            # compressImage, notify, reactions...
 ├── docs/screenshots/        # Capturas para el README
 ├── .env.example
 ├── index.html
