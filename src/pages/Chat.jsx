@@ -119,6 +119,19 @@ function timeLabel(date) {
 // cree un array nuevo por render (dispararia el autoscroll de mas).
 const NO_MESSAGES = [];
 
+// El "escribiendo" se apaga solo si no llega el stop (se perdio o el otro
+// cerro la pestaña): toda entrada mas vieja que esto se descarta.
+const TYPING_TTL_MS = 4000;
+// Sin teclas nuevas durante este tiempo, se avisa typing:stop.
+const TYPING_IDLE_MS = 2500;
+
+function typingLabel(users) {
+  const names = users.map(displayName);
+  if (names.length === 1) return `${names[0]} esta escribiendo…`;
+  if (names.length === 2) return `${names[0]} y ${names[1]} estan escribiendo…`;
+  return 'Varias personas estan escribiendo…';
+}
+
 export default function Chat() {
   const { user, token, signOut } = useAuth();
   // Mensajes por conversacion: clave 'global' o 'dm:<userId>'. Cada bucket de
@@ -136,6 +149,8 @@ export default function Chat() {
   const [roomsModalOpen, setRoomsModalOpen] = useState(false);
   // Sala cuya invitacion se esta enviando por DM (null = modal cerrado).
   const [inviteRoom, setInviteRoom] = useState(null);
+  // Quien esta escribiendo, por conversacion: key -> { userId: { user, at } }.
+  const [typers, setTypers] = useState({});
   const [connected, setConnected] = useState(false);
   const [text, setText] = useState('');
   // Mensaje al que se esta respondiendo (null = mensaje normal).
@@ -162,9 +177,36 @@ export default function Chat() {
   // sirve para mapear cada room:message a su bucket.
   const globalRoomIdRef = useRef(null);
 
+  // true mientras ya avisamos typing:start y no mandamos el stop.
+  const typingSentRef = useRef(false);
+  const typingTimerRef = useRef(null);
+
   useEffect(() => {
     activeKeyRef.current = activeKey;
   }, [activeKey]);
+
+  // Poda de "escribiendo" vencidos (stop perdido o pestaña cerrada).
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTypers((prev) => {
+        const now = Date.now();
+        let changed = false;
+        const next = {};
+        for (const [key, users] of Object.entries(prev)) {
+          const kept = Object.fromEntries(
+            Object.entries(users).filter(([, v]) => now - v.at < TYPING_TTL_MS),
+          );
+          if (Object.keys(kept).length !== Object.keys(users).length) changed = true;
+          if (Object.keys(kept).length > 0) next[key] = kept;
+        }
+        return changed ? next : prev;
+      });
+    }, 1500);
+    return () => {
+      clearInterval(id);
+      clearTimeout(typingTimerRef.current);
+    };
+  }, []);
 
   const activeMessages = buckets[activeKey] ?? NO_MESSAGES;
   // Partner del DM abierto (null si no hay un DM abierto).
@@ -176,6 +218,7 @@ export default function Chat() {
     ? (rooms.find((r) => `room:${r.id}` === activeKey) ?? null)
     : null;
   const joinedRooms = rooms.filter((r) => r.joined);
+  const activeTypers = Object.values(typers[activeKey] ?? {}).map((v) => v.user);
 
   // Cierra el menu de estado al hacer click afuera.
   useEffect(() => {
@@ -222,6 +265,35 @@ export default function Chat() {
     const onRoomCreated = (room) => {
       setRooms((prev) => (prev.some((r) => r.id === room.id) ? prev : [...prev, room]));
     };
+    // La conversacion a la que pertenece un evento de typing: la sala (por
+    // roomId) o, si es un DM, la conversacion con quien escribe.
+    const typingKey = ({ user: typer, roomId }) =>
+      roomId
+        ? roomId === globalRoomIdRef.current
+          ? 'global'
+          : `room:${roomId}`
+        : `dm:${typer.id}`;
+    const onTypingStart = (payload) => {
+      const typer = payload.user;
+      if (typer.id === user.id) return;
+      const key = typingKey(payload);
+      setTypers((prev) => ({
+        ...prev,
+        [key]: { ...prev[key], [typer.id]: { user: typer, at: Date.now() } },
+      }));
+    };
+    const onTypingStop = (payload) => {
+      const key = typingKey(payload);
+      setTypers((prev) => {
+        if (!prev[key]?.[payload.user.id]) return prev;
+        const users = { ...prev[key] };
+        delete users[payload.user.id];
+        const next = { ...prev };
+        if (Object.keys(users).length > 0) next[key] = users;
+        else delete next[key];
+        return next;
+      });
+    };
     const onDm = (msg) => {
       const partner = msg.sender.id === user.id ? msg.recipient : msg.sender;
       const key = `dm:${partner.id}`;
@@ -259,6 +331,8 @@ export default function Chat() {
     socket.on('dm:message:deleted', onDeleted);
     socket.on('rooms:list', setRooms);
     socket.on('room:created', onRoomCreated);
+    socket.on('typing:start', onTypingStart);
+    socket.on('typing:stop', onTypingStop);
 
     socket.connect();
     return () => {
@@ -273,6 +347,8 @@ export default function Chat() {
       socket.off('dm:message:deleted', onDeleted);
       socket.off('rooms:list', setRooms);
       socket.off('room:created', onRoomCreated);
+      socket.off('typing:start', onTypingStart);
+      socket.off('typing:stop', onTypingStop);
       socket.disconnect();
     };
     // user.id es un primitivo estable para la sesion (no cambia aunque el
@@ -287,10 +363,39 @@ export default function Chat() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [activeMessages]);
 
+  // A quien va dirigido el typing de ESTA conversacion (se lee antes de
+  // cambiar de chat, por eso stopTyping va primero en openChat).
+  function typingTarget() {
+    return activeDmUser
+      ? { toUserId: activeDmUser.id }
+      : { roomId: activeRoom ? activeRoom.id : null };
+  }
+
+  function stopTyping() {
+    clearTimeout(typingTimerRef.current);
+    if (typingSentRef.current) {
+      socketRef.current?.emit('typing:stop', typingTarget());
+      typingSentRef.current = false;
+    }
+  }
+
+  // Avisa typing:start una sola vez por rafaga de teclas; el stop sale solo
+  // tras TYPING_IDLE_MS sin escribir (o al enviar / cambiar de chat).
+  function handleTyping() {
+    if (!connected) return;
+    if (!typingSentRef.current) {
+      socketRef.current?.emit('typing:start', typingTarget());
+      typingSentRef.current = true;
+    }
+    clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(stopTyping, TYPING_IDLE_MS);
+  }
+
   function handleSend(e) {
     e.preventDefault();
     const content = text.trim();
     if (!content || !connected) return;
+    stopTyping();
     const payload = { content, replyToId: replyTo?.id ?? null };
     if (activeDmUser) {
       socketRef.current.emit('dm:message', { ...payload, toUserId: activeDmUser.id });
@@ -307,6 +412,7 @@ export default function Chat() {
   // Cambia de conversacion: descarta la respuesta pendiente (era de la otra
   // conversacion), limpia sus no-leidos y deja el input listo para escribir.
   function openChat(key) {
+    stopTyping();
     setActiveKey(key);
     setReplyTo(null);
     setUnread((prev) => ({ ...prev, [key]: 0 }));
@@ -767,12 +873,21 @@ export default function Chat() {
             </div>
           )}
 
-          <form className="chat-input" onSubmit={handleSend}>
+          <div className="chat-input-area">
+            {activeTypers.length > 0 && (
+              <div className="typing-indicator" aria-live="polite">
+                {typingLabel(activeTypers)}
+              </div>
+            )}
+            <form className="chat-input" onSubmit={handleSend}>
             <input
               ref={inputRef}
               type="text"
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                handleTyping();
+              }}
               placeholder={
                 connected
                   ? replyTo
@@ -793,7 +908,8 @@ export default function Chat() {
             <button type="submit" disabled={!connected || !text.trim()}>
               Enviar
             </button>
-          </form>
+            </form>
+          </div>
         </section>
       </div>
 
