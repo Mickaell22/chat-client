@@ -158,6 +158,59 @@ function LockIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </svg>
+  );
+}
+
+function UserXIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="17" x2="22" y1="8" y2="13" />
+      <line x1="22" x2="17" y1="8" y2="13" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.93 4.93 1.41 1.41" />
+      <path d="m17.66 17.66 1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m6.34 17.66-1.41 1.41" />
+      <path d="m19.07 4.93-1.41 1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </svg>
+  );
+}
+
 // Un DM cuyo contenido es 'pub:invite/<codigo>/<sala>' se renderiza como
 // tarjeta de invitacion con boton "Unirse". ponytail: convencion sobre el
 // contenido en vez de un tipo de mensaje en la DB; techo: se puede escribir
@@ -250,6 +303,18 @@ export default function Chat() {
   const [reactingTo, setReactingTo] = useState(null);
   // Mensaje pendiente de confirmar borrado (null = modal cerrado).
   const [confirmDelete, setConfirmDelete] = useState(null);
+  // Usuario pendiente de confirmar expulsion de la sala (null = cerrado).
+  const [confirmKick, setConfirmKick] = useState(null);
+  // Busqueda en la conversacion activa (modal). results null = sin buscar aun.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchError, setSearchError] = useState('');
+  // Mensajes fijados de la sala activa (modal).
+  const [pinsOpen, setPinsOpen] = useState(false);
+  const [pins, setPins] = useState([]);
+  // Tema visual. Global (no por usuario): es una preferencia del dispositivo.
+  const [theme, setTheme] = useState(() => localStorage.getItem('pub.theme') || 'dark');
   // Id del usuario cuyo perfil se esta mirando (null = modal cerrado).
   const [viewProfileId, setViewProfileId] = useState(null);
   const [myStatus, setMyStatus] = useState('online');
@@ -303,6 +368,13 @@ export default function Chat() {
     activeKeyRef.current = activeKey;
   }, [activeKey]);
 
+  // Aplica el tema al <html> (main.jsx lo siembra antes del primer render
+  // para que login/registro tambien lo respeten sin flash).
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('pub.theme', theme);
+  }, [theme]);
+
   // Poda de "escribiendo" vencidos (stop perdido o pestaña cerrada).
   useEffect(() => {
     const id = setInterval(() => {
@@ -337,6 +409,9 @@ export default function Chat() {
     : null;
   const joinedRooms = rooms.filter((r) => r.joined);
   const activeTypers = Object.values(typers[activeKey] ?? {}).map((v) => v.user);
+  // Modero la sala activa si soy su creador (la global no la modera nadie).
+  // El server revalida cada accion: esto solo decide que botones mostrar.
+  const canMod = Boolean(activeRoom && activeRoom.createdBy === user?.id);
 
   // Llamadas de voz 1-a-1 (WebRTC). Reusa el mismo socket singleton que el chat.
   const callSocket = useMemo(() => getSocket(token), [token]);
@@ -513,8 +588,40 @@ export default function Chat() {
           Object.entries(prev).map(([k, list]) => [k, list.filter((m) => m.id !== id)]),
         ),
       );
+      setPins((prev) => prev.filter((m) => m.id !== id));
       // Si estaba respondiendo al mensaje que se borro, cancelar la respuesta.
       setReplyTo((r) => (r && r.id === id ? null : r));
+    };
+    // Fijado/desfijado: se refleja en los buckets y en el panel de fijados.
+    // ponytail: si fijan un mensaje que no esta cargado, el panel lo trae
+    // completo recien al reabrirse (room:pins), no en vivo.
+    const onPinned = ({ id, pinnedAt }) => {
+      setBuckets((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([k, list]) => [
+            k,
+            list.map((m) => (m.id === id ? { ...m, pinnedAt } : m)),
+          ]),
+        ),
+      );
+      if (!pinnedAt) setPins((prev) => prev.filter((m) => m.id !== id));
+    };
+    // Me expulsaron de una sala: espejo de leaveRoom, pero avisando.
+    const onKicked = ({ roomId, name }) => {
+      setRooms((prev) =>
+        prev
+          .filter((r) => r.id !== roomId || !r.isPrivate)
+          .map((r) =>
+            r.id === roomId ? { ...r, joined: false, inviteCode: null } : r,
+          ),
+      );
+      setBuckets((prev) => {
+        const rest = { ...prev };
+        delete rest[`room:${roomId}`];
+        return rest;
+      });
+      if (activeKeyRef.current === `room:${roomId}`) setActiveKey('global');
+      setUploadState(`Fuiste expulsado de # ${name}.`);
     };
 
     socket.on('connect', onConnect);
@@ -534,6 +641,8 @@ export default function Chat() {
     socket.on('room:created', onRoomCreated);
     socket.on('typing:start', onTypingStart);
     socket.on('typing:stop', onTypingStop);
+    socket.on('message:pinned', onPinned);
+    socket.on('room:kicked', onKicked);
 
     socket.connect();
     return () => {
@@ -554,6 +663,8 @@ export default function Chat() {
       socket.off('room:created', onRoomCreated);
       socket.off('typing:start', onTypingStart);
       socket.off('typing:stop', onTypingStop);
+      socket.off('message:pinned', onPinned);
+      socket.off('room:kicked', onKicked);
       socket.disconnect();
     };
     // user.id es un primitivo estable para la sesion (no cambia aunque el
@@ -684,6 +795,12 @@ export default function Chat() {
     setActiveKey(key);
     setReplyTo(null);
     setEditing(null);
+    // La busqueda y los fijados eran de la conversacion anterior.
+    setSearchOpen(false);
+    setSearchQ('');
+    setSearchResults(null);
+    setSearchError('');
+    setPinsOpen(false);
     setText((t) => (editing ? '' : t));
     setUnread((prev) => ({ ...prev, [key]: 0 }));
     // Persiste "leido hasta ahora" (la global viaja con su id real).
@@ -835,6 +952,53 @@ export default function Chat() {
     socketRef.current?.emit('message:react', { id: m.id, emoji });
   }
 
+  // Busca en la conversacion activa (sala o DM). Los resultados llegan por
+  // ack y se muestran en el modal, del mas reciente al mas viejo.
+  function runSearch(e) {
+    e.preventDefault();
+    const payload = activeDmUser
+      ? { q: searchQ, withUserId: activeDmUser.id }
+      : { q: searchQ, roomId: activeRoom ? activeRoom.id : null };
+    socketRef.current?.emit('messages:search', payload, (res) => {
+      if (res?.error) {
+        setSearchError(res.error);
+        setSearchResults(null);
+        return;
+      }
+      setSearchError('');
+      setSearchResults(res?.messages ?? []);
+    });
+  }
+
+  // Abre el panel de fijados de la sala activa (pide la lista por ack).
+  function openPins() {
+    const roomId = activeRoom ? activeRoom.id : globalRoomIdRef.current;
+    if (!roomId) return;
+    socketRef.current?.emit('room:pins', { roomId }, (res) => {
+      setPins(res?.messages ?? []);
+    });
+    setPinsOpen(true);
+  }
+
+  function togglePin(m) {
+    socketRef.current?.emit('message:pin', { id: m.id }, (res) => {
+      if (res?.error) setUploadState(res.error);
+    });
+  }
+
+  function doKick() {
+    if (confirmKick && activeRoom) {
+      socketRef.current?.emit(
+        'room:kick',
+        { roomId: activeRoom.id, userId: confirmKick.id },
+        (res) => {
+          if (res?.error) setUploadState(res.error);
+        },
+      );
+    }
+    setConfirmKick(null);
+  }
+
   function startReply(m) {
     setReplyTo(m);
     setEditing(null);
@@ -918,6 +1082,15 @@ export default function Chat() {
           pub
         </span>
         <div className="chat-bar-user">
+          <button
+            type="button"
+            className="chat-bell"
+            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+            aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+            title={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
+          >
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </button>
           <button
             type="button"
             className="chat-bell"
@@ -1067,6 +1240,26 @@ export default function Chat() {
             >
               {connected ? 'conectado' : 'conectando…'}
             </span>
+            <button
+              type="button"
+              className="channel-invite channel-icon-btn"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Buscar mensajes en esta conversacion"
+              title="Buscar mensajes"
+            >
+              <SearchIcon />
+            </button>
+            {!activeDmUser && (
+              <button
+                type="button"
+                className="channel-invite channel-icon-btn"
+                onClick={openPins}
+                aria-label="Ver mensajes fijados"
+                title="Mensajes fijados"
+              >
+                <PinIcon />
+              </button>
+            )}
             {activeRoom?.inviteCode && (
               <button
                 type="button"
@@ -1234,6 +1427,7 @@ export default function Chat() {
                           </span>
                           <span className="msg-time">{timeLabel(date)}</span>
                           {m.editedAt && <span className="msg-edited">(editado)</span>}
+                          {m.pinnedAt && <span className="msg-edited">(fijado)</span>}
                         </div>
                       )}
                       {m.imageUrl && (
@@ -1330,6 +1524,15 @@ export default function Chat() {
                       >
                         <ReplyIcon />
                       </button>
+                      {!m.recipientId && !invite && (
+                        <button
+                          type="button"
+                          onClick={() => togglePin(m)}
+                          aria-label={m.pinnedAt ? 'Desfijar mensaje' : 'Fijar mensaje'}
+                        >
+                          <PinIcon />
+                        </button>
+                      )}
                       {mine && !invite && (
                         <button
                           type="button"
@@ -1339,13 +1542,22 @@ export default function Chat() {
                           <PencilIcon />
                         </button>
                       )}
-                      {mine && (
+                      {(mine || canMod) && (
                         <button
                           type="button"
                           onClick={(e) => handleDelete(m, e)}
                           aria-label="Eliminar mensaje"
                         >
                           <TrashIcon />
+                        </button>
+                      )}
+                      {canMod && !mine && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmKick(m.sender)}
+                          aria-label={`Expulsar a ${displayName(m.sender)} de la sala`}
+                        >
+                          <UserXIcon />
                         </button>
                       )}
                     </div>
@@ -1511,6 +1723,132 @@ export default function Chat() {
               autoFocus
             >
               Eliminar
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {searchOpen && (
+        <Modal onClose={() => setSearchOpen(false)} labelledBy="search-title">
+          <h2 id="search-title" className="modal-title">
+            Buscar en{' '}
+            {activeDmUser
+              ? `@${displayName(activeDmUser)}`
+              : `# ${activeRoom ? activeRoom.name : 'global'}`}
+          </h2>
+          <form className="search-form" onSubmit={runSearch}>
+            <input
+              type="text"
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Texto a buscar…"
+              aria-label="Texto a buscar"
+              maxLength={80}
+              autoFocus
+            />
+            <button type="submit" disabled={searchQ.trim().length < 2}>
+              Buscar
+            </button>
+          </form>
+          {searchError && <p className="modal-text search-error">{searchError}</p>}
+          {searchResults && (
+            <>
+              <p className="modal-text">
+                {searchResults.length === 0
+                  ? 'Sin resultados.'
+                  : `${searchResults.length} resultado${searchResults.length === 1 ? '' : 's'} (max. 20, del mas reciente al mas viejo).`}
+              </p>
+              <ul className="result-list">
+                {searchResults.map((m) => (
+                  <li key={m.id} className="result-row">
+                    <Avatar user={m.sender} size={28} />
+                    <div className="result-body">
+                      <div className="msg-meta">
+                        <span className="msg-author">{displayName(m.sender)}</span>
+                        <span className="msg-time">
+                          {new Date(m.createdAt).toLocaleString([], {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      <div className="result-content">{m.content || '(imagen)'}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Modal>
+      )}
+
+      {pinsOpen && (
+        <Modal onClose={() => setPinsOpen(false)} labelledBy="pins-title">
+          <h2 id="pins-title" className="modal-title">
+            Fijados de # {activeRoom ? activeRoom.name : 'global'}
+          </h2>
+          {pins.length === 0 ? (
+            <p className="modal-text">
+              No hay mensajes fijados. Usa el icono del pin sobre un mensaje
+              para fijarlo.
+            </p>
+          ) : (
+            <ul className="result-list">
+              {pins.map((m) => (
+                <li key={m.id} className="result-row">
+                  <Avatar user={m.sender} size={28} />
+                  <div className="result-body">
+                    <div className="msg-meta">
+                      <span className="msg-author">{displayName(m.sender)}</span>
+                      <span className="msg-time">
+                        {new Date(m.createdAt).toLocaleString([], {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <div className="result-content">{m.content || '(imagen)'}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="result-unpin"
+                    onClick={() => togglePin(m)}
+                    aria-label="Desfijar mensaje"
+                    title="Desfijar"
+                  >
+                    <CloseIcon />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
+      )}
+
+      {confirmKick && (
+        <Modal onClose={() => setConfirmKick(null)} labelledBy="kick-title">
+          <h2 id="kick-title" className="modal-title">
+            Expulsar de la sala
+          </h2>
+          <p className="modal-text">
+            ¿Expulsar a <strong>{displayName(confirmKick)}</strong> de{' '}
+            <strong># {activeRoom?.name}</strong>? Podra volver a unirse si la
+            sala es publica o si alguien le comparte el codigo.
+          </p>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setConfirmKick(null)}
+            >
+              Cancelar
+            </button>
+            <button type="button" className="btn-danger" onClick={doKick} autoFocus>
+              Expulsar
             </button>
           </div>
         </Modal>

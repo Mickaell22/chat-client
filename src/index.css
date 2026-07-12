@@ -44,6 +44,30 @@
   color: var(--text);
 }
 
+/* Tema claro (toggle en el chat, persistido en localStorage 'pub.theme').
+   Solo se pisan los colores BASE: todos los derivados (rings, fondos
+   translucidos, sombras) se recalculan solos via color-mix. */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-1: #f4f4f2;
+  --bg-2: #ececea;
+  --card-bg: #ffffff;
+  --card-border: #dedede;
+  --input-bg: #fafafa;
+  --input-border: #d4d4d8;
+  --text: #1b1b1f;
+  --text-muted: #62626b; /* zinc-ish, legible sobre blanco */
+  --accent: #18181b; /* CTA oscuro sobre fondo claro (monocromo invertido) */
+  --accent-2: #3f3f46;
+  --accent-hover: #000000;
+  --on-accent: #fafafa; /* texto CLARO sobre el boton oscuro */
+  --online: #16a34a; /* green-600: contraste suficiente sobre claro */
+  --error: #dc2626; /* red-600 */
+  --warning: #b45309; /* amber-700 */
+  --shadow-color: #a1a1aa; /* sombras suaves, no negras */
+}
+
 * {
   box-sizing: border-box;
 }
@@ -2156,4 +2180,125 @@ a:hover {
 .channel-invite.is-live {
   border-color: var(--online);
   color: var(--online);
+}
+
+/* Botones de icono de la cabecera del canal (buscar, fijados) */
+.channel-invite.channel-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+}
+
+.channel-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Compartir pantalla en videollamada */
+.call-share {
+  background: var(--input-bg, #26262c);
+  color: var(--text);
+}
+
+.call-share.is-sharing {
+  background: color-mix(in srgb, var(--online) 22%, transparent);
+  color: var(--online);
+}
+
+.call-camera:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Buscador de mensajes (modal) */
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.search-form input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.search-form button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.search-error {
+  color: var(--error);
+}
+
+/* Lista de resultados (busqueda y fijados) */
+.result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.result-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+}
+
+.result-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-content {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.result-unpin {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.result-unpin:hover {
+  background: var(--input-bg);
+  color: var(--error);
+}
+
+.result-unpin svg {
+  width: 14px;
+  height: 14px;
 }
