@@ -1936,3 +1936,30 @@ a:hover {
   width: 14px;
   height: 14px;
 }
+
+/* Campana de avisos de DM en la barra superior (mismo look que el link de
+   amigos; pisa el estilo generico de .chat-bar-user button) */
+.chat-bar-user .chat-bell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.chat-bar-user .chat-bell:hover {
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+.chat-bar-user .chat-bell svg {
+  width: 18px;
+  height: 18px;
+}
