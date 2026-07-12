@@ -167,6 +167,9 @@ function timeLabel(date) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+// Tamaño de pagina del historial (MESSAGE_HISTORY_LIMIT del backend).
+const HISTORY_PAGE = 50;
+
 // Referencia estable para "sin mensajes": evita que un bucket inexistente
 // cree un array nuevo por render (dispararia el autoscroll de mas).
 const NO_MESSAGES = [];
@@ -233,6 +236,11 @@ export default function Chat() {
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const statusPickerRef = useRef(null);
+  // Paginacion del historial por conversacion: { hasMore, loading }.
+  const historyMetaRef = useRef({});
+  // Altura previa del contenedor cuando se PREPENDEA una pagina vieja, para
+  // restaurar la posicion en vez de ir al fondo.
+  const prependRef = useRef(null);
   // Espejo de activeKey para los handlers del socket (viven fuera del render).
   const activeKeyRef = useRef('global');
   // Id (de la DB) de la sala global; llega con room:history al conectar y
@@ -340,6 +348,10 @@ export default function Chat() {
     };
     const onHistory = ({ roomId, messages }) => {
       globalRoomIdRef.current = roomId;
+      historyMetaRef.current.global = {
+        hasMore: messages.length >= HISTORY_PAGE,
+        loading: false,
+      };
       setBuckets((prev) => ({ ...prev, global: messages }));
     };
     // Un room:message puede ser de la global o de cualquier sala unida (el
@@ -494,7 +506,14 @@ export default function Chat() {
   // pagina entera. scrollIntoView arrastraba todo el layout.
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    if (prependRef.current != null) {
+      // Se agrego una pagina vieja arriba: mantener lo que se estaba viendo.
+      el.scrollTop = el.scrollHeight - prependRef.current;
+      prependRef.current = null;
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [activeMessages]);
 
   // A quien va dirigido el typing de ESTA conversacion (se lee antes de
@@ -616,7 +635,12 @@ export default function Chat() {
     );
     if (!(key in buckets)) {
       socketRef.current?.emit('dm:history', { withUserId: partner.id }, (res) => {
-        if (res?.messages) setBuckets((prev) => ({ ...prev, [key]: res.messages }));
+        if (!res?.messages) return;
+        historyMetaRef.current[key] = {
+          hasMore: res.messages.length >= HISTORY_PAGE,
+          loading: false,
+        };
+        setBuckets((prev) => ({ ...prev, [key]: res.messages }));
       });
     }
     setViewProfileId(null);
@@ -627,7 +651,12 @@ export default function Chat() {
     const key = `room:${room.id}`;
     if (!(key in buckets)) {
       socketRef.current?.emit('room:history', { roomId: room.id }, (res) => {
-        if (res?.messages) setBuckets((prev) => ({ ...prev, [key]: res.messages }));
+        if (!res?.messages) return;
+        historyMetaRef.current[key] = {
+          hasMore: res.messages.length >= HISTORY_PAGE,
+          loading: false,
+        };
+        setBuckets((prev) => ({ ...prev, [key]: res.messages }));
       });
     }
     setRoomsModalOpen(false);
@@ -706,6 +735,32 @@ export default function Chat() {
     setNotifyOn(next);
     localStorage.setItem(`pub.notify.${user.id}`, next ? '1' : '0');
     if (next) await ensureNotifyPermission();
+  }
+
+  // Carga la pagina anterior del historial de la conversacion activa cuando
+  // el usuario llega arriba del todo.
+  function loadOlder() {
+    const key = activeKey;
+    const list = buckets[key];
+    const meta = historyMetaRef.current[key] ?? { hasMore: true, loading: false };
+    if (!list?.length || meta.loading || !meta.hasMore) return;
+    historyMetaRef.current[key] = { ...meta, loading: true };
+    const before = list[0].createdAt;
+    const done = (res) => {
+      const hasMore = Boolean(res?.messages) && res.messages.length >= HISTORY_PAGE;
+      historyMetaRef.current[key] = { hasMore, loading: false };
+      if (!res?.messages || res.messages.length === 0) return;
+      prependRef.current = listRef.current?.scrollHeight ?? 0;
+      setBuckets((prev) =>
+        key in prev ? { ...prev, [key]: [...res.messages, ...prev[key]] } : prev,
+      );
+    };
+    if (key.startsWith('dm:')) {
+      socketRef.current?.emit('dm:history', { withUserId: key.slice(3), before }, done);
+    } else {
+      const roomId = key === 'global' ? globalRoomIdRef.current : key.slice(5);
+      socketRef.current?.emit('room:history', { roomId, before }, done);
+    }
   }
 
   function toggleReaction(m, emoji) {
@@ -998,7 +1053,13 @@ export default function Chat() {
             </div>
           )}
 
-          <div className="chat-messages" ref={listRef}>
+          <div
+            className="chat-messages"
+            ref={listRef}
+            onScroll={(e) => {
+              if (e.currentTarget.scrollTop < 60) loadOlder();
+            }}
+          >
             {activeMessages.length === 0 && (
               <p className="chat-empty">
                 {activeDmUser
