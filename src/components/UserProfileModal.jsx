@@ -133,6 +133,19 @@ export default function UserProfileModal({ userId, token, onClose, onMessage }) 
           {profile.createdAt && (
             <p className="profile-hint">Miembro desde {memberSince(profile.createdAt)}</p>
           )}
+          {profile.common?.rooms.length > 0 && (
+            <p className="profile-hint">
+              Salas en comun: {profile.common.rooms.map((n) => `# ${n}`).join(', ')}
+            </p>
+          )}
+          {profile.common?.friends.count > 0 && (
+            <p className="profile-hint">
+              {profile.common.friends.count === 1 ? 'Amigo' : 'Amigos'} en comun:{' '}
+              {profile.common.friends.names.join(', ')}
+              {profile.common.friends.count > profile.common.friends.names.length &&
+                ` y ${profile.common.friends.count - profile.common.friends.names.length} mas`}
+            </p>
+          )}
           {actionError && <p className="auth-error" role="alert">{actionError}</p>}
           <div className="modal-actions">
             {friendAction()}
