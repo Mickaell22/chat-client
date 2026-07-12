@@ -79,6 +79,8 @@ WebSockets al backend para enviar y recibir mensajes al instante.
   el video viajan P2P entre navegadores; el servidor solo hace la
   señalización). Requiere configurar `VITE_STUN_URL`; sin ella solo conecta
   dentro de la misma red.
+- **Compartir pantalla** durante una videollamada (botón de monitor en el
+  panel de llamada; el botón "Dejar de compartir" del navegador también corta).
 - **Canales de voz grupales por sala** (mesh P2P con tope de participantes),
   con lista de quién está en voz y silenciar micrófono.
 - **Editar mensajes propios** (con marca "(editado)") y **reacciones con
@@ -90,6 +92,14 @@ WebSockets al backend para enviar y recibir mensajes al instante.
   recargas y sesiones (marcas de lectura en el servidor).
 - **Scroll infinito**: el historial carga hacia atrás por páginas de 50 al
   llegar arriba.
+- **Búsqueda de mensajes** en la conversación abierta (lupa en la cabecera;
+  sala o DM, hasta 20 resultados).
+- **Mensajes fijados** por sala: cualquier miembro fija/desfija desde las
+  acciones del mensaje y los ve con el pin de la cabecera.
+- **Moderación**: el creador de una sala puede eliminar mensajes ajenos y
+  expulsar miembros (con confirmación).
+- **Tema claro/oscuro** con toggle en el encabezado (persistido en el
+  navegador).
 - Historial de mensajes al abrir una conversación.
 - Rutas protegidas: sin sesión válida no se accede al chat.
 
