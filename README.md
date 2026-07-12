@@ -73,6 +73,9 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 - **Envío de imágenes** comprimidas en el navegador (canvas, lado máximo
   1600px) antes de subirse; opcionalmente con texto como caption.
 - Responder y eliminar mensajes (estilo Discord) en salas y DM.
+- **Llamadas de voz 1-a-1** desde un DM (WebRTC: el audio viaja P2P entre
+  navegadores; el servidor solo hace la señalización). Requiere configurar
+  `VITE_STUN_URL`; sin ella solo conecta dentro de la misma red.
 - Historial de mensajes al abrir una conversación.
 - Rutas protegidas: sin sesión válida no se accede al chat.
 
@@ -163,6 +166,7 @@ cp .env.example .env
 |----------|-------------|---------|
 | `VITE_API_URL` | Base de la API HTTP de autenticación | `http://localhost:4000` |
 | `VITE_SOCKET_URL` | URL del servidor WebSocket | `http://localhost:4000` |
+| `VITE_STUN_URL` | Servidor STUN para las llamadas de voz (WebRTC) | `stun:stun.l.google.com:19302` |
 
 > Son variables de **build-time**: al desplegar, hay que definirlas antes de buildear.
 
