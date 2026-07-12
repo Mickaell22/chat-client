@@ -30,7 +30,12 @@ export function useCall(socket) {
   // Streams expuestos para que el panel pinte los <video> en videollamadas.
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
+  // true mientras se comparte pantalla (reemplaza el track de la camara).
+  const [sharing, setSharing] = useState(false);
   const kindRef = useRef('audio');
+  // Track de pantalla activo (getDisplayMedia). La camara sigue viva en
+  // localStreamRef para poder volver a ella al dejar de compartir.
+  const screenTrackRef = useRef(null);
 
   const setKindBoth = (k) => {
     kindRef.current = k;
@@ -66,6 +71,12 @@ export function useCall(socket) {
       pcRef.current.close();
       pcRef.current = null;
     }
+    if (screenTrackRef.current) {
+      screenTrackRef.current.onended = null;
+      screenTrackRef.current.stop();
+      screenTrackRef.current = null;
+    }
+    setSharing(false);
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
@@ -201,6 +212,42 @@ export function useCall(socket) {
     setMuted(!track.enabled);
   }, []);
 
+  // Deja de compartir pantalla: vuelve a enviar la camara (que nunca se
+  // detuvo) y recien despues corta el track de pantalla.
+  const stopScreenShare = useCallback(() => {
+    const screen = screenTrackRef.current;
+    if (!screen) return;
+    screen.onended = null;
+    screenTrackRef.current = null;
+    setSharing(false);
+    const cam = localStreamRef.current?.getVideoTracks()[0] ?? null;
+    const sender = pcRef.current?.getSenders().find((s) => s.track === screen);
+    if (sender) sender.replaceTrack(cam).catch(() => {});
+    screen.stop();
+    setLocalStream(localStreamRef.current);
+  }, []);
+
+  // Compartir pantalla (toggle, solo en videollamada): getDisplayMedia +
+  // replaceTrack sobre el sender de video, sin renegociar SDP. El boton
+  // "Dejar de compartir" del navegador tambien corta (onended).
+  const toggleScreen = useCallback(async () => {
+    if (screenTrackRef.current) return stopScreenShare();
+    const sender = pcRef.current?.getSenders().find((s) => s.track?.kind === 'video');
+    if (!sender) return;
+    try {
+      const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const track = display.getVideoTracks()[0];
+      await sender.replaceTrack(track);
+      screenTrackRef.current = track;
+      track.onended = () => stopScreenShare();
+      // La vista propia muestra lo que se esta enviando (la pantalla).
+      setLocalStream(new MediaStream([track]));
+      setSharing(true);
+    } catch {
+      /* el usuario cancelo el selector de pantalla: no es un error */
+    }
+  }, [stopScreenShare]);
+
   // --- Señalizacion entrante ---
 
   useEffect(() => {
@@ -306,6 +353,7 @@ export function useCall(socket) {
     error,
     kind,
     camOff,
+    sharing,
     localStream,
     remoteStream,
     startCall,
@@ -314,5 +362,6 @@ export function useCall(socket) {
     hangup,
     toggleMute,
     toggleCamera,
+    toggleScreen,
   };
 }

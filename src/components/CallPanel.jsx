@@ -51,6 +51,17 @@ function CameraIcon({ off }) {
   );
 }
 
+function MonitorIcon({ off }) {
+  return (
+    <svg {...svgProps}>
+      <rect width="20" height="14" x="2" y="3" rx="2" />
+      <line x1="8" x2="16" y1="21" y2="21" />
+      <line x1="12" x2="12" y1="17" y2="21" />
+      {off && <line x1="2" x2="22" y1="2" y2="22" />}
+    </svg>
+  );
+}
+
 function useCallTimer(active) {
   const [secs, setSecs] = useState(0);
   useEffect(() => {
@@ -75,6 +86,7 @@ export default function CallPanel({ call }) {
     error,
     kind,
     camOff,
+    sharing,
     localStream,
     remoteStream,
     acceptCall,
@@ -82,6 +94,7 @@ export default function CallPanel({ call }) {
     hangup,
     toggleMute,
     toggleCamera,
+    toggleScreen,
   } = call;
   const timer = useCallTimer(status === 'in-call');
 
@@ -172,9 +185,23 @@ export default function CallPanel({ call }) {
                 type="button"
                 className={`call-btn call-camera ${camOff ? 'is-muted' : ''}`}
                 onClick={toggleCamera}
+                disabled={sharing}
                 aria-label={camOff ? 'Encender camara' : 'Apagar camara'}
+                title={sharing ? 'No disponible mientras compartes pantalla' : undefined}
               >
                 <CameraIcon off={camOff} />
+              </button>
+            )}
+            {video && status === 'in-call' && (
+              <button
+                type="button"
+                className={`call-btn call-share ${sharing ? 'is-sharing' : ''}`}
+                onClick={toggleScreen}
+                aria-label={
+                  sharing ? 'Dejar de compartir pantalla' : 'Compartir pantalla'
+                }
+              >
+                <MonitorIcon off={sharing} />
               </button>
             )}
             {(status === 'calling' || status === 'connecting' || status === 'in-call') && (
