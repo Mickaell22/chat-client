@@ -15,6 +15,7 @@ import RoomsModal from '../components/RoomsModal.jsx';
 import InviteModal from '../components/InviteModal.jsx';
 import CallPanel from '../components/CallPanel.jsx';
 import { useCall } from '../lib/useCall.js';
+import { useVoiceRoom } from '../lib/useVoiceRoom.js';
 
 const STATUS_OPTIONS = [
   { value: 'online', label: 'Conectado' },
@@ -106,6 +107,25 @@ function PencilIcon() {
   return (
     <svg {...svgProps}>
       <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+    </svg>
+  );
+}
+
+function MicIcon({ muted }) {
+  return (
+    <svg {...svgProps}>
+      <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+      <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+      <line x1="12" x2="12" y1="18" y2="22" />
+      {muted && <line x1="3" x2="21" y1="3" y2="21" />}
+    </svg>
+  );
+}
+
+function HeadphonesIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />
     </svg>
   );
 }
@@ -210,6 +230,9 @@ export default function Chat() {
   const [online, setOnline] = useState([]);
   // Salas visibles: todas las publicas + las privadas donde soy miembro.
   const [rooms, setRooms] = useState([]);
+  // Id de la sala global tambien como estado (el ref no se puede leer en
+  // render; esto alimenta el boton de voz de la global).
+  const [globalRoomId, setGlobalRoomId] = useState(null);
   const [roomsModalOpen, setRoomsModalOpen] = useState(false);
   // Sala cuya invitacion se esta enviando por DM (null = modal cerrado).
   const [inviteRoom, setInviteRoom] = useState(null);
@@ -318,6 +341,8 @@ export default function Chat() {
   // Llamadas de voz 1-a-1 (WebRTC). Reusa el mismo socket singleton que el chat.
   const callSocket = useMemo(() => getSocket(token), [token]);
   const call = useCall(callSocket);
+  // Canal de voz grupal por sala (mesh P2P sobre el mismo socket).
+  const voice = useVoiceRoom(callSocket);
 
   // Cierra el picker de reacciones al hacer click en cualquier otro lado.
   useEffect(() => {
@@ -374,6 +399,7 @@ export default function Chat() {
     };
     const onHistory = ({ roomId, messages }) => {
       globalRoomIdRef.current = roomId;
+      setGlobalRoomId(roomId);
       // Lo que el usuario tiene delante al (re)conectar queda leido.
       const active = activeKeyRef.current;
       socket.emit('read:mark', {
@@ -1045,6 +1071,29 @@ export default function Chat() {
                 Invitar
               </button>
             )}
+            {!activeDmUser && (
+              (() => {
+                const voiceRoomId = activeRoom ? activeRoom.id : globalRoomId;
+                const inHere = voice.joinedRoomId === voiceRoomId;
+                const count = (voice.membersByRoom[voiceRoomId] ?? []).length;
+                return (
+                  <button
+                    type="button"
+                    className={`channel-invite channel-call channel-voice ${inHere ? 'is-live' : ''}`}
+                    onClick={() => (inHere ? voice.leave() : voice.join(voiceRoomId))}
+                    disabled={
+                      !voiceRoomId ||
+                      call.status !== 'idle' ||
+                      (voice.joinedRoomId && !inHere)
+                    }
+                    aria-label={inHere ? 'Salir del canal de voz' : 'Unirse al canal de voz'}
+                  >
+                    <HeadphonesIcon />
+                    {inHere ? 'Salir de voz' : `Voz${count > 0 ? ` (${count})` : ''}`}
+                  </button>
+                );
+              })()
+            )}
             {activeDmUser && (
               <>
                 <button
@@ -1495,6 +1544,50 @@ export default function Chat() {
       )}
 
       <CallPanel call={call} />
+
+      {(voice.joinedRoomId || voice.error) && (
+        <div className="voice-panel" role="dialog" aria-label="Canal de voz">
+          {voice.error && <p className="call-error">{voice.error}</p>}
+          {voice.joinedRoomId && (
+            <>
+              <span className="voice-title">
+                Voz en # {rooms.find((r) => r.id === voice.joinedRoomId)?.name ?? 'global'}
+              </span>
+              <ul className="voice-members">
+                {(voice.membersByRoom[voice.joinedRoomId] ?? []).map((m) => {
+                  const me = m.id === user.id;
+                  const connected = me || voice.peerStates[m.id] === 'connected';
+                  return (
+                    <li key={m.id} className={connected ? 'is-connected' : ''}>
+                      <span className="voice-dot" aria-hidden="true" />
+                      {displayName(m)}
+                      {me && ' (tu)'}
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="voice-actions">
+                <button
+                  type="button"
+                  className={`call-btn call-mute ${voice.muted ? 'is-muted' : ''}`}
+                  onClick={voice.toggleMute}
+                  aria-label={voice.muted ? 'Activar microfono' : 'Silenciar microfono'}
+                >
+                  <MicIcon muted={voice.muted} />
+                </button>
+                <button
+                  type="button"
+                  className="call-btn call-hangup"
+                  onClick={voice.leave}
+                  aria-label="Salir del canal de voz"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
