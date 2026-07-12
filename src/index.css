@@ -1924,3 +1924,15 @@ a:hover {
     animation: none !important;
   }
 }
+
+/* Boton "Llamar" de la cabecera del DM (icono + texto) */
+.channel-invite.channel-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.channel-call svg {
+  width: 14px;
+  height: 14px;
+}
