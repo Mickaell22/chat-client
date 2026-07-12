@@ -619,13 +619,18 @@ export default function Chat() {
       return;
     }
     const payload = { content, replyToId: replyTo?.id ?? null };
+    // Si el server rechaza (p.ej. rate limit), se avisa en la linea del input.
+    const onAck = (res) => {
+      if (res?.error) setUploadState(res.error);
+    };
     if (activeDmUser) {
-      socketRef.current.emit('dm:message', { ...payload, toUserId: activeDmUser.id });
+      socketRef.current.emit('dm:message', { ...payload, toUserId: activeDmUser.id }, onAck);
     } else {
-      socketRef.current.emit('room:message', {
-        ...payload,
-        roomId: activeRoom ? activeRoom.id : null,
-      });
+      socketRef.current.emit(
+        'room:message',
+        { ...payload, roomId: activeRoom ? activeRoom.id : null },
+        onAck,
+      );
     }
     setText('');
     setReplyTo(null);
