@@ -8,6 +8,8 @@ import { asDotStatus } from '../lib/presence.js';
 import Avatar from '../components/Avatar.jsx';
 import Modal from '../components/Modal.jsx';
 import UserProfileModal from '../components/UserProfileModal.jsx';
+import RoomsModal from '../components/RoomsModal.jsx';
+import InviteModal from '../components/InviteModal.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'online', label: 'Conectado' },
@@ -66,6 +68,25 @@ function FriendsIcon() {
   );
 }
 
+function LockIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+// Un DM cuyo contenido es 'pub:invite/<codigo>/<sala>' se renderiza como
+// tarjeta de invitacion con boton "Unirse". ponytail: convencion sobre el
+// contenido en vez de un tipo de mensaje en la DB; techo: se puede escribir
+// a mano, pero no da mas poder que compartir el codigo en texto.
+function parseInvite(content) {
+  if (!content?.startsWith('pub:invite/')) return null;
+  const [, code, name] = content.split('/');
+  return code && name ? { code, name } : null;
+}
+
 // Ventana para agrupar mensajes consecutivos del mismo autor (estilo Discord).
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -110,6 +131,11 @@ export default function Chat() {
   // recargar. Upgrade: persistir lastReadAt por conversacion en la DB.
   const [unread, setUnread] = useState({});
   const [online, setOnline] = useState([]);
+  // Salas visibles: todas las publicas + las privadas donde soy miembro.
+  const [rooms, setRooms] = useState([]);
+  const [roomsModalOpen, setRoomsModalOpen] = useState(false);
+  // Sala cuya invitacion se esta enviando por DM (null = modal cerrado).
+  const [inviteRoom, setInviteRoom] = useState(null);
   const [connected, setConnected] = useState(false);
   const [text, setText] = useState('');
   // Mensaje al que se esta respondiendo (null = mensaje normal).
@@ -132,16 +158,24 @@ export default function Chat() {
   const statusPickerRef = useRef(null);
   // Espejo de activeKey para los handlers del socket (viven fuera del render).
   const activeKeyRef = useRef('global');
+  // Id (de la DB) de la sala global; llega con room:history al conectar y
+  // sirve para mapear cada room:message a su bucket.
+  const globalRoomIdRef = useRef(null);
 
   useEffect(() => {
     activeKeyRef.current = activeKey;
   }, [activeKey]);
 
   const activeMessages = buckets[activeKey] ?? NO_MESSAGES;
-  // Partner del DM abierto (null si esta abierta la sala global).
+  // Partner del DM abierto (null si no hay un DM abierto).
   const activeDmUser = activeKey.startsWith('dm:')
     ? (convos.find((c) => `dm:${c.user.id}` === activeKey)?.user ?? null)
     : null;
+  // Sala abierta que no es la global (null si es la global o un DM).
+  const activeRoom = activeKey.startsWith('room:')
+    ? (rooms.find((r) => `room:${r.id}` === activeKey) ?? null)
+    : null;
+  const joinedRooms = rooms.filter((r) => r.joined);
 
   // Cierra el menu de estado al hacer click afuera.
   useEffect(() => {
@@ -171,11 +205,22 @@ export default function Chat() {
       if (msg.sender.id === user.id || activeKeyRef.current === key) return;
       setUnread((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
     };
-    const onHistory = ({ messages }) =>
+    const onHistory = ({ roomId, messages }) => {
+      globalRoomIdRef.current = roomId;
       setBuckets((prev) => ({ ...prev, global: messages }));
+    };
+    // Un room:message puede ser de la global o de cualquier sala unida (el
+    // socket esta en todas). Se enruta a su bucket por roomId.
     const onMessage = (msg) => {
-      setBuckets((prev) => ({ ...prev, global: [...prev.global, msg] }));
-      bumpUnread('global', msg);
+      const key =
+        msg.roomId === globalRoomIdRef.current ? 'global' : `room:${msg.roomId}`;
+      setBuckets((prev) =>
+        key in prev ? { ...prev, [key]: [...prev[key], msg] } : prev,
+      );
+      bumpUnread(key, msg);
+    };
+    const onRoomCreated = (room) => {
+      setRooms((prev) => (prev.some((r) => r.id === room.id) ? prev : [...prev, room]));
     };
     const onDm = (msg) => {
       const partner = msg.sender.id === user.id ? msg.recipient : msg.sender;
@@ -212,6 +257,8 @@ export default function Chat() {
     socket.on('dm:conversations', setConvos);
     socket.on('dm:message', onDm);
     socket.on('dm:message:deleted', onDeleted);
+    socket.on('rooms:list', setRooms);
+    socket.on('room:created', onRoomCreated);
 
     socket.connect();
     return () => {
@@ -224,6 +271,8 @@ export default function Chat() {
       socket.off('dm:conversations', setConvos);
       socket.off('dm:message', onDm);
       socket.off('dm:message:deleted', onDeleted);
+      socket.off('rooms:list', setRooms);
+      socket.off('room:created', onRoomCreated);
       socket.disconnect();
     };
     // user.id es un primitivo estable para la sesion (no cambia aunque el
@@ -246,7 +295,10 @@ export default function Chat() {
     if (activeDmUser) {
       socketRef.current.emit('dm:message', { ...payload, toUserId: activeDmUser.id });
     } else {
-      socketRef.current.emit('room:message', payload);
+      socketRef.current.emit('room:message', {
+        ...payload,
+        roomId: activeRoom ? activeRoom.id : null,
+      });
     }
     setText('');
     setReplyTo(null);
@@ -276,6 +328,76 @@ export default function Chat() {
     }
     setViewProfileId(null);
     openChat(key);
+  }
+
+  function openRoom(room) {
+    const key = `room:${room.id}`;
+    if (!(key in buckets)) {
+      socketRef.current?.emit('room:history', { roomId: room.id }, (res) => {
+        if (res?.messages) setBuckets((prev) => ({ ...prev, [key]: res.messages }));
+      });
+    }
+    setRoomsModalOpen(false);
+    openChat(key);
+  }
+
+  // Alta o refresco de una sala en la lista local (tras crear o unirse).
+  function upsertRoom(room) {
+    setRooms((prev) => [...prev.filter((r) => r.id !== room.id), room]);
+  }
+
+  function createRoom(payload, cb) {
+    socketRef.current?.emit('room:create', payload, (res) => {
+      if (res?.room) {
+        upsertRoom(res.room);
+        openRoom(res.room);
+      }
+      cb?.(res);
+    });
+  }
+
+  // payload: { roomId } (sala publica) o { code } (invitacion).
+  function joinRoom(payload, cb) {
+    socketRef.current?.emit('room:join', payload, (res) => {
+      if (res?.room) {
+        upsertRoom(res.room);
+        openRoom(res.room);
+      }
+      cb?.(res);
+    });
+  }
+
+  function leaveRoom(room) {
+    socketRef.current?.emit('room:leave', { roomId: room.id }, () => {});
+    // Una privada desaparece de la lista; una publica queda como "no unida".
+    setRooms((prev) =>
+      room.isPrivate
+        ? prev.filter((r) => r.id !== room.id)
+        : prev.map((r) =>
+            r.id === room.id ? { ...r, joined: false, inviteCode: null } : r,
+          ),
+    );
+    setBuckets((prev) => {
+      const rest = { ...prev };
+      delete rest[`room:${room.id}`];
+      return rest;
+    });
+    if (activeKey === `room:${room.id}`) openChat('global');
+  }
+
+  // La invitacion viaja como DM con el formato que entiende parseInvite.
+  function sendInvite(room, toUser) {
+    socketRef.current?.emit('dm:message', {
+      content: `pub:invite/${room.inviteCode}/${room.name}`,
+      toUserId: toUser.id,
+      replyToId: null,
+    });
+  }
+
+  function acceptInvite(invite) {
+    const joined = rooms.find((r) => r.inviteCode === invite.code && r.joined);
+    if (joined) openRoom(joined);
+    else joinRoom({ code: invite.code });
   }
 
   function startReply(m) {
@@ -397,6 +519,26 @@ export default function Chat() {
                 <span className="chat-online-name">global</span>
                 {unread.global > 0 && <span className="side-badge">{unread.global}</span>}
               </li>
+              {joinedRooms.map((r) => {
+                const key = `room:${r.id}`;
+                return (
+                  <li
+                    key={r.id}
+                    className={`is-clickable ${activeKey === key ? 'is-active' : ''}`}
+                    onClick={() => openRoom(r)}
+                  >
+                    <span className="side-hash" aria-hidden="true">
+                      {r.isPrivate ? <LockIcon /> : '#'}
+                    </span>
+                    <span className="chat-online-name">{r.name}</span>
+                    {unread[key] > 0 && <span className="side-badge">{unread[key]}</span>}
+                  </li>
+                );
+              })}
+              <li className="is-clickable side-more" onClick={() => setRoomsModalOpen(true)}>
+                <span className="side-hash" aria-hidden="true">+</span>
+                <span className="chat-online-name">salas</span>
+              </li>
             </ul>
           </section>
 
@@ -453,7 +595,11 @@ export default function Chat() {
         <section className="chat-channel">
           <header className="channel-header">
             <span className="channel-name">
-              {activeDmUser ? `@${displayName(activeDmUser)}` : '# global'}
+              {activeDmUser
+                ? `@${displayName(activeDmUser)}`
+                : activeRoom
+                  ? `# ${activeRoom.name}`
+                  : '# global'}
             </span>
             <span
               className={`chat-status ${connected ? 'is-on' : ''}`}
@@ -462,6 +608,15 @@ export default function Chat() {
             >
               {connected ? 'conectado' : 'conectando…'}
             </span>
+            {activeRoom?.inviteCode && (
+              <button
+                type="button"
+                className="channel-invite"
+                onClick={() => setInviteRoom(activeRoom)}
+              >
+                Invitar
+              </button>
+            )}
           </header>
 
           {user && user.emailVerified === false && !bannerDismissed && (
@@ -495,7 +650,9 @@ export default function Chat() {
               <p className="chat-empty">
                 {activeDmUser
                   ? `Este es el comienzo de tu conversacion con ${displayName(activeDmUser)}.`
-                  : 'Aun no hay mensajes. Escribi el primero.'}
+                  : activeRoom
+                    ? `Este es el comienzo de # ${activeRoom.name}.`
+                    : 'Aun no hay mensajes. Escribi el primero.'}
               </p>
             )}
             {activeMessages.map((m, i) => {
@@ -512,6 +669,9 @@ export default function Chat() {
                 date - prevDate < GROUP_WINDOW_MS &&
                 !m.replyTo;
               const mine = m.sender.id === user?.id;
+              const invite = parseInvite(m.content);
+              const inviteJoined =
+                invite && rooms.some((r) => r.inviteCode === invite.code && r.joined);
 
               return (
                 <Fragment key={m.id}>
@@ -553,7 +713,18 @@ export default function Chat() {
                           <span className="msg-time">{timeLabel(date)}</span>
                         </div>
                       )}
-                      <div className="msg-content">{m.content}</div>
+                      {invite ? (
+                        <div className="msg-invite">
+                          <span className="msg-invite-text">
+                            Invitacion a la sala <strong># {invite.name}</strong>
+                          </span>
+                          <button type="button" onClick={() => acceptInvite(invite)}>
+                            {inviteJoined ? 'Abrir' : 'Unirse'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="msg-content">{m.content}</div>
+                      )}
                     </div>
                     <div className="msg-actions">
                       <button
@@ -608,13 +779,13 @@ export default function Chat() {
                     ? `Respondiendo a ${displayName(replyTo.sender)}…`
                     : activeDmUser
                       ? `Escribe un mensaje para ${displayName(activeDmUser)}…`
-                      : 'Escribe un mensaje en # global…'
+                      : `Escribe un mensaje en # ${activeRoom ? activeRoom.name : 'global'}…`
                   : 'Conectando…'
               }
               aria-label={
                 activeDmUser
                   ? `Mensaje para ${displayName(activeDmUser)}`
-                  : 'Mensaje para el canal global'
+                  : `Mensaje para el canal ${activeRoom ? activeRoom.name : 'global'}`
               }
               maxLength={2000}
               autoComplete="off"
@@ -682,6 +853,28 @@ export default function Chat() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {roomsModalOpen && (
+        <RoomsModal
+          rooms={rooms}
+          onCreate={createRoom}
+          onJoin={joinRoom}
+          onOpen={openRoom}
+          onLeave={leaveRoom}
+          onClose={() => setRoomsModalOpen(false)}
+        />
+      )}
+
+      {inviteRoom && (
+        <InviteModal
+          room={inviteRoom}
+          me={user}
+          convos={convos}
+          online={online}
+          onSend={sendInvite}
+          onClose={() => setInviteRoom(null)}
+        />
       )}
 
       {viewProfileId && (
