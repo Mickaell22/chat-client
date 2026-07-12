@@ -1976,3 +1976,70 @@ a:hover {
   height: 14px;
   flex-shrink: 0;
 }
+
+/* Chips de reacciones bajo el mensaje */
+.msg-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.msg-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.msg-reaction:hover {
+  border-color: var(--accent);
+}
+
+/* Reaccion propia: resaltada */
+.msg-reaction.is-mine {
+  border-color: var(--accent);
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+/* Picker flotante de reacciones (el .msg ya es position: relative) */
+.reaction-picker {
+  position: absolute;
+  top: -2.4rem;
+  right: 0.5rem;
+  z-index: 5;
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.3rem;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-card);
+}
+
+.reaction-picker button {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: background 0.12s, transform 0.12s;
+}
+
+.reaction-picker button:hover {
+  background: var(--input-bg);
+  transform: scale(1.15);
+}
