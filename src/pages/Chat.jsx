@@ -4,6 +4,7 @@ import { useAuth } from '../auth/context.js';
 import { getSocket } from '../lib/socket.js';
 import { resendVerification, uploadChatImage } from '../lib/api.js';
 import { compressImage } from '../lib/compressImage.js';
+import { ensureNotifyPermission, showNotification, beep } from '../lib/notify.js';
 import { displayName } from '../lib/displayName.js';
 import { asDotStatus } from '../lib/presence.js';
 import Avatar from '../components/Avatar.jsx';
@@ -85,6 +86,16 @@ function ImageIcon() {
       <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
       <circle cx="9" cy="9" r="2" />
       <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </svg>
+  );
+}
+
+function BellIcon({ off }) {
+  return (
+    <svg {...svgProps}>
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      {off && <line x1="3" x2="21" y1="3" y2="21" />}
     </svg>
   );
 }
@@ -187,6 +198,10 @@ export default function Chat() {
   const [bannerDismissed, setBannerDismissed] = useState(
     () => Boolean(user) && localStorage.getItem(`pub.verifyBannerDismissed.${user.id}`) === '1',
   );
+  // Avisos de DM (notificacion del navegador + sonido). Pref por usuario.
+  const [notifyOn, setNotifyOn] = useState(
+    () => Boolean(user) && localStorage.getItem(`pub.notify.${user.id}`) === '1',
+  );
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendError, setResendError] = useState('');
@@ -199,6 +214,14 @@ export default function Chat() {
   // Id (de la DB) de la sala global; llega con room:history al conectar y
   // sirve para mapear cada room:message a su bucket.
   const globalRoomIdRef = useRef(null);
+
+  const notifyOnRef = useRef(false);
+  // openDm se define mas abajo; el handler de dm:message lo usa via ref.
+  const openDmRef = useRef(null);
+
+  useEffect(() => {
+    notifyOnRef.current = notifyOn;
+  }, [notifyOn]);
 
   // true mientras ya avisamos typing:start y no mandamos el stop.
   const typingSentRef = useRef(false);
@@ -342,6 +365,22 @@ export default function Chat() {
         ...prev.filter((c) => c.user.id !== partner.id),
       ]);
       bumpUnread(key, msg);
+      // Aviso nativo + beep si el DM es de otro y no lo estoy mirando.
+      if (
+        msg.sender.id !== user.id &&
+        notifyOnRef.current &&
+        (document.hidden || activeKeyRef.current !== key)
+      ) {
+        beep();
+        showNotification({
+          title: displayName(msg.sender),
+          body: parseInvite(msg.content)
+            ? 'Te invito a una sala'
+            : msg.content || '(imagen)',
+          icon: msg.sender.avatarUrl,
+          onClick: () => openDmRef.current?.(msg.sender),
+        });
+      }
     };
     // Borrado (de sala o DM): se quita de todos los buckets, es mas simple
     // que averiguar en cual vive.
@@ -582,6 +621,21 @@ export default function Chat() {
     else joinRoom({ code: invite.code });
   }
 
+  // El handler del socket necesita openDm ya definido: se refresca por efecto.
+  useEffect(() => {
+    openDmRef.current = openDm;
+  });
+
+  // Activa/desactiva los avisos de DM. Activar pide el permiso del navegador
+  // (estamos dentro de un gesto del usuario); si lo deniegan queda solo el
+  // beep, que no necesita permiso.
+  async function toggleNotify() {
+    const next = !notifyOn;
+    setNotifyOn(next);
+    localStorage.setItem(`pub.notify.${user.id}`, next ? '1' : '0');
+    if (next) await ensureNotifyPermission();
+  }
+
   function startReply(m) {
     setReplyTo(m);
     inputRef.current?.focus();
@@ -651,6 +705,16 @@ export default function Chat() {
           pub
         </span>
         <div className="chat-bar-user">
+          <button
+            type="button"
+            className="chat-bell"
+            onClick={toggleNotify}
+            aria-pressed={notifyOn}
+            aria-label={notifyOn ? 'Desactivar avisos de mensajes' : 'Activar avisos de mensajes'}
+            title={notifyOn ? 'Avisos de DM activados' : 'Avisos de DM desactivados'}
+          >
+            <BellIcon off={!notifyOn} />
+          </button>
           <div className="status-picker" ref={statusPickerRef}>
             <button
               type="button"
