@@ -195,8 +195,8 @@ export default function Chat() {
   const [activeKey, setActiveKey] = useState('global');
   // Conversaciones DM (partner + fecha del ultimo mensaje) para el sidebar.
   const [convos, setConvos] = useState([]);
-  // No leidos por conversacion. ponytail: solo en memoria, se resetea al
-  // recargar. Upgrade: persistir lastReadAt por conversacion en la DB.
+  // No leidos por conversacion. Se siembra desde unread:state (persistido en
+  // la DB via read:mark) al conectar y se actualiza en vivo.
   const [unread, setUnread] = useState({});
   const [online, setOnline] = useState([]);
   // Salas visibles: todas las publicas + las privadas donde soy miembro.
@@ -340,14 +340,36 @@ export default function Chat() {
       setMyStatus(saved || 'online');
     };
     const onDisconnect = () => setConnected(false);
+    // Clave de conversacion del lado server: la global viaja por su id real.
+    const toServerKey = (key) =>
+      key === 'global' ? `room:${globalRoomIdRef.current}` : key;
     // Suma un no-leido si el mensaje es de otro y su conversacion no es la
-    // que esta abierta.
+    // que esta abierta; si SI esta abierta, refresca la marca de lectura.
     const bumpUnread = (key, msg) => {
-      if (msg.sender.id === user.id || activeKeyRef.current === key) return;
+      if (msg.sender.id === user.id) return;
+      if (activeKeyRef.current === key) {
+        socket.emit('read:mark', { chatKey: toServerKey(key) });
+        return;
+      }
       setUnread((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
+    };
+    // No leidos persistidos, calculados por el server al conectar.
+    const onUnreadState = (state) => {
+      const translated = {};
+      for (const [k, n] of Object.entries(state)) {
+        translated[k === `room:${globalRoomIdRef.current}` ? 'global' : k] = n;
+      }
+      // La conversacion visible en este momento no cuenta como pendiente.
+      delete translated[activeKeyRef.current];
+      setUnread(translated);
     };
     const onHistory = ({ roomId, messages }) => {
       globalRoomIdRef.current = roomId;
+      // Lo que el usuario tiene delante al (re)conectar queda leido.
+      const active = activeKeyRef.current;
+      socket.emit('read:mark', {
+        chatKey: active === 'global' ? `room:${roomId}` : active,
+      });
       historyMetaRef.current.global = {
         hasMore: messages.length >= HISTORY_PAGE,
         loading: false,
@@ -472,6 +494,7 @@ export default function Chat() {
     socket.on('room:message:edited', onEdited);
     socket.on('dm:message:edited', onEdited);
     socket.on('message:reactions', onReactions);
+    socket.on('unread:state', onUnreadState);
     socket.on('rooms:list', setRooms);
     socket.on('room:created', onRoomCreated);
     socket.on('typing:start', onTypingStart);
@@ -491,6 +514,7 @@ export default function Chat() {
       socket.off('room:message:edited', onEdited);
       socket.off('dm:message:edited', onEdited);
       socket.off('message:reactions', onReactions);
+      socket.off('unread:state', onUnreadState);
       socket.off('rooms:list', setRooms);
       socket.off('room:created', onRoomCreated);
       socket.off('typing:start', onTypingStart);
@@ -622,6 +646,10 @@ export default function Chat() {
     setEditing(null);
     setText((t) => (editing ? '' : t));
     setUnread((prev) => ({ ...prev, [key]: 0 }));
+    // Persiste "leido hasta ahora" (la global viaja con su id real).
+    socketRef.current?.emit('read:mark', {
+      chatKey: key === 'global' ? `room:${globalRoomIdRef.current}` : key,
+    });
     inputRef.current?.focus();
   }
 
