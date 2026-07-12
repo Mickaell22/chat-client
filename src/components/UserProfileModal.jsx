@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import Avatar from './Avatar.jsx';
-import { getUserProfile } from '../lib/api.js';
+import { getUserProfile, sendFriendRequest, respondFriendRequest } from '../lib/api.js';
 import { displayName } from '../lib/displayName.js';
 import { asDotStatus } from '../lib/presence.js';
 
@@ -21,12 +21,20 @@ function memberSince(createdAt) {
 export default function UserProfileModal({ userId, token, onClose, onMessage }) {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
+  // Estado de amistad local: { state, id }. Arranca del perfil y se actualiza
+  // al enviar/aceptar la solicitud sin re-pedir el perfil.
+  const [friendship, setFriendship] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [showPhoto, setShowPhoto] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     getUserProfile({ token, userId })
       .then(({ user }) => {
-        if (!cancelled) setProfile(user);
+        if (cancelled) return;
+        setProfile(user);
+        setFriendship(user.friendship ?? null);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -35,6 +43,61 @@ export default function UserProfileModal({ userId, token, onClose, onMessage }) 
       cancelled = true;
     };
   }, [token, userId]);
+
+  async function addFriend() {
+    setBusy(true);
+    setActionError('');
+    try {
+      const res = await sendFriendRequest({ token, friendId: profile.id });
+      setFriendship({ state: 'pending_sent', id: res?.id ?? res?.friendship?.id ?? null });
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function acceptRequest() {
+    setBusy(true);
+    setActionError('');
+    try {
+      await respondFriendRequest({ token, id: friendship.id, state: 'ACCEPTED' });
+      setFriendship((f) => ({ ...f, state: 'friends' }));
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Boton/etiqueta de amistad segun el estado (nada para uno mismo ni si hay
+  // un bloqueo de por medio).
+  function friendAction() {
+    switch (friendship?.state) {
+      case 'none':
+        return (
+          <button type="button" className="btn-primary" disabled={busy} onClick={addFriend}>
+            Agregar amigo
+          </button>
+        );
+      case 'pending_sent':
+        return (
+          <button type="button" className="btn-ghost" disabled>
+            Solicitud enviada
+          </button>
+        );
+      case 'pending_received':
+        return (
+          <button type="button" className="btn-primary" disabled={busy} onClick={acceptRequest}>
+            Aceptar solicitud
+          </button>
+        );
+      case 'friends':
+        return <span className="profile-friends-label">Ya son amigos</span>;
+      default:
+        return null;
+    }
+  }
 
   return (
     <Modal onClose={onClose} labelledBy="profile-modal-title">
@@ -46,7 +109,19 @@ export default function UserProfileModal({ userId, token, onClose, onMessage }) 
             className="profile-banner"
             style={profile.profileColor ? { '--profile-color': profile.profileColor } : undefined}
           >
-            <Avatar user={profile} size={72} status={asDotStatus(profile.status)} />
+            {profile.avatarUrl ? (
+              <button
+                type="button"
+                className="profile-photo-btn"
+                onClick={() => setShowPhoto(true)}
+                aria-label="Ver la foto de perfil en grande"
+                title="Ver foto"
+              >
+                <Avatar user={profile} size={72} status={asDotStatus(profile.status)} />
+              </button>
+            ) : (
+              <Avatar user={profile} size={72} status={asDotStatus(profile.status)} />
+            )}
           </div>
           <h2 id="profile-modal-title" className="modal-title">
             {displayName(profile)}
@@ -58,7 +133,9 @@ export default function UserProfileModal({ userId, token, onClose, onMessage }) 
           {profile.createdAt && (
             <p className="profile-hint">Miembro desde {memberSince(profile.createdAt)}</p>
           )}
+          {actionError && <p className="auth-error" role="alert">{actionError}</p>}
           <div className="modal-actions">
+            {friendAction()}
             <button type="button" className="btn-ghost" onClick={onClose}>
               Cerrar
             </button>
@@ -68,6 +145,16 @@ export default function UserProfileModal({ userId, token, onClose, onMessage }) 
               </button>
             )}
           </div>
+          {showPhoto && (
+            <div
+              className="photo-lightbox"
+              onClick={() => setShowPhoto(false)}
+              role="button"
+              aria-label="Cerrar foto"
+            >
+              <img src={profile.avatarUrl} alt={`Foto de ${displayName(profile)}`} />
+            </div>
+          )}
         </>
       )}
     </Modal>
