@@ -41,6 +41,16 @@ function MicIcon({ muted }) {
   );
 }
 
+function CameraIcon({ off }) {
+  return (
+    <svg {...svgProps}>
+      <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />
+      <rect x="2" y="6" width="14" height="12" rx="2" />
+      {off && <line x1="2" x2="22" y1="2" y2="22" />}
+    </svg>
+  );
+}
+
 function useCallTimer(active) {
   const [secs, setSecs] = useState(0);
   useEffect(() => {
@@ -58,26 +68,70 @@ function useCallTimer(active) {
 }
 
 export default function CallPanel({ call }) {
-  const { status, peer, muted, error, acceptCall, rejectCall, hangup, toggleMute } = call;
+  const {
+    status,
+    peer,
+    muted,
+    error,
+    kind,
+    camOff,
+    localStream,
+    remoteStream,
+    acceptCall,
+    rejectCall,
+    hangup,
+    toggleMute,
+    toggleCamera,
+  } = call;
   const timer = useCallTimer(status === 'in-call');
 
   if (status === 'idle' && !error) return null;
 
   const name = peer?.username ?? 'Usuario';
 
+  const video = kind === 'video';
   const statusText = {
     calling: `Llamando a ${name}…`,
-    incoming: `${name} te esta llamando`,
+    incoming: video ? `${name} te esta llamando (video)` : `${name} te esta llamando`,
     connecting: 'Conectando…',
     'in-call': `En llamada con ${name} · ${timer}`,
   };
 
   return (
-    <div className="call-panel" role="dialog" aria-label="Llamada de voz">
+    <div
+      className={`call-panel ${video ? 'is-video' : ''}`}
+      role="dialog"
+      aria-label={video ? 'Videollamada' : 'Llamada de voz'}
+    >
       {error && status === 'idle' ? (
         <p className="call-error">{error}</p>
       ) : (
         <>
+          {video && (status === 'connecting' || status === 'in-call') && (
+            <div className="call-videos">
+              <video
+                className="call-video-remote"
+                autoPlay
+                playsInline
+                ref={(el) => {
+                  if (el && remoteStream && el.srcObject !== remoteStream) {
+                    el.srcObject = remoteStream;
+                  }
+                }}
+              />
+              <video
+                className="call-video-local"
+                autoPlay
+                playsInline
+                muted
+                ref={(el) => {
+                  if (el && localStream && el.srcObject !== localStream) {
+                    el.srcObject = localStream;
+                  }
+                }}
+              />
+            </div>
+          )}
           <div className="call-info">
             <span className={`call-pulse ${status === 'in-call' ? 'is-live' : ''}`} />
             <span className="call-status">{statusText[status]}</span>
@@ -111,6 +165,16 @@ export default function CallPanel({ call }) {
                 aria-label={muted ? 'Activar microfono' : 'Silenciar microfono'}
               >
                 <MicIcon muted={muted} />
+              </button>
+            )}
+            {video && status === 'in-call' && (
+              <button
+                type="button"
+                className={`call-btn call-camera ${camOff ? 'is-muted' : ''}`}
+                onClick={toggleCamera}
+                aria-label={camOff ? 'Encender camara' : 'Apagar camara'}
+              >
+                <CameraIcon off={camOff} />
               </button>
             )}
             {(status === 'calling' || status === 'connecting' || status === 'in-call') && (
