@@ -114,13 +114,13 @@ export function removeFriendship({ token, id }) {
   return authFetch(`/api/friendships/${id}`, { method: 'DELETE', token });
 }
 
-// Sube la foto de avatar (multipart). Necesita el JWT. Devuelve { user }.
-export async function uploadAvatar({ token, file }) {
+// POST multipart generico (para subir imagenes). Devuelve el body parseado.
+async function postMultipart(path, { token, field, file }) {
   const body = new FormData();
-  body.append('avatar', file);
+  body.append(field, file);
   let res;
   try {
-    res = await fetch(`${API_URL}/api/users/me/avatar`, {
+    res = await fetch(`${API_URL}${path}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body, // sin Content-Type: el navegador pone el boundary del multipart
@@ -131,4 +131,15 @@ export async function uploadAvatar({ token, file }) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'No se pudo subir la imagen.');
   return data;
+}
+
+// Sube la foto de avatar (multipart). Necesita el JWT. Devuelve { user }.
+export function uploadAvatar({ token, file }) {
+  return postMultipart('/api/users/me/avatar', { token, field: 'avatar', file });
+}
+
+// Sube una imagen de chat (ya comprimida en el cliente). Devuelve { url },
+// que luego viaja como imageUrl en room:message / dm:message.
+export function uploadChatImage({ token, file }) {
+  return postMultipart('/api/uploads/image', { token, field: 'image', file });
 }

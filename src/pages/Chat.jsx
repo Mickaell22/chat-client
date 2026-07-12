@@ -2,7 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/context.js';
 import { getSocket } from '../lib/socket.js';
-import { resendVerification } from '../lib/api.js';
+import { resendVerification, uploadChatImage } from '../lib/api.js';
+import { compressImage } from '../lib/compressImage.js';
 import { displayName } from '../lib/displayName.js';
 import { asDotStatus } from '../lib/presence.js';
 import Avatar from '../components/Avatar.jsx';
@@ -64,6 +65,16 @@ function FriendsIcon() {
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function ImageIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
     </svg>
   );
 }
@@ -151,6 +162,8 @@ export default function Chat() {
   const [inviteRoom, setInviteRoom] = useState(null);
   // Quien esta escribiendo, por conversacion: key -> { userId: { user, at } }.
   const [typers, setTypers] = useState({});
+  // '' | 'uploading' | mensaje de error del envio de imagen.
+  const [uploadState, setUploadState] = useState('');
   const [connected, setConnected] = useState(false);
   const [text, setText] = useState('');
   // Mensaje al que se esta respondiendo (null = mensaje normal).
@@ -180,6 +193,14 @@ export default function Chat() {
   // true mientras ya avisamos typing:start y no mandamos el stop.
   const typingSentRef = useRef(false);
   const typingTimerRef = useRef(null);
+  const fileRef = useRef(null);
+
+  // Los errores del envio de imagen se descartan solos a los pocos segundos.
+  useEffect(() => {
+    if (!uploadState || uploadState === 'uploading') return;
+    const id = setTimeout(() => setUploadState(''), 5000);
+    return () => clearTimeout(id);
+  }, [uploadState]);
 
   useEffect(() => {
     activeKeyRef.current = activeKey;
@@ -407,6 +428,47 @@ export default function Chat() {
     }
     setText('');
     setReplyTo(null);
+  }
+
+  // Enviar imagen: se valida, se comprime con canvas (lado max 1600, JPEG),
+  // se sube por HTTP y el mensaje viaja por socket solo con la URL. El texto
+  // del input (si hay) va como caption del mismo mensaje.
+  async function handleImagePick(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite elegir el mismo archivo dos veces seguidas
+    if (!file || !connected) return;
+    if (!file.type.startsWith('image/')) {
+      setUploadState('Solo se pueden enviar imagenes.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadState('La imagen no puede superar los 10 MB.');
+      return;
+    }
+    setUploadState('uploading');
+    try {
+      const compressed = await compressImage(file);
+      const { url } = await uploadChatImage({ token, file: compressed });
+      const payload = {
+        content: text.trim(),
+        imageUrl: url,
+        replyToId: replyTo?.id ?? null,
+      };
+      if (activeDmUser) {
+        socketRef.current.emit('dm:message', { ...payload, toUserId: activeDmUser.id });
+      } else {
+        socketRef.current.emit('room:message', {
+          ...payload,
+          roomId: activeRoom ? activeRoom.id : null,
+        });
+      }
+      stopTyping();
+      setText('');
+      setReplyTo(null);
+      setUploadState('');
+    } catch (err) {
+      setUploadState(err.message || 'No se pudo enviar la imagen.');
+    }
   }
 
   // Cambia de conversacion: descarta la respuesta pendiente (era de la otra
@@ -804,7 +866,7 @@ export default function Chat() {
                             {displayName(m.replyTo.sender)}
                           </span>
                           <span className="msg-reply-content">
-                            {m.replyTo.content}
+                            {m.replyTo.content || '(imagen)'}
                           </span>
                         </div>
                       )}
@@ -819,6 +881,27 @@ export default function Chat() {
                           <span className="msg-time">{timeLabel(date)}</span>
                         </div>
                       )}
+                      {m.imageUrl && (
+                        <a
+                          href={m.imageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="msg-image-link"
+                        >
+                          <img
+                            className="msg-image"
+                            src={m.imageUrl}
+                            alt={`Imagen enviada por ${displayName(m.sender)}`}
+                            loading="lazy"
+                            // La imagen carga despues del autoscroll y agranda
+                            // la lista: al cargar se vuelve a bajar al final.
+                            onLoad={() => {
+                              const el = listRef.current;
+                              if (el) el.scrollTop = el.scrollHeight;
+                            }}
+                          />
+                        </a>
+                      )}
                       {invite ? (
                         <div className="msg-invite">
                           <span className="msg-invite-text">
@@ -829,7 +912,7 @@ export default function Chat() {
                           </button>
                         </div>
                       ) : (
-                        <div className="msg-content">{m.content}</div>
+                        m.content && <div className="msg-content">{m.content}</div>
                       )}
                     </div>
                     <div className="msg-actions">
@@ -861,7 +944,9 @@ export default function Chat() {
               <span className="reply-banner-text">
                 <Avatar user={replyTo.sender} size={16} />
                 Respondiendo a <strong>{displayName(replyTo.sender)}</strong>
-                <span className="reply-banner-content">{replyTo.content}</span>
+                <span className="reply-banner-content">
+                  {replyTo.content || '(imagen)'}
+                </span>
               </span>
               <button
                 type="button"
@@ -874,12 +959,41 @@ export default function Chat() {
           )}
 
           <div className="chat-input-area">
-            {activeTypers.length > 0 && (
-              <div className="typing-indicator" aria-live="polite">
-                {typingLabel(activeTypers)}
+            {(activeTypers.length > 0 || uploadState) && (
+              <div className="input-overlays">
+                {activeTypers.length > 0 && (
+                  <div className="typing-indicator" aria-live="polite">
+                    {typingLabel(activeTypers)}
+                  </div>
+                )}
+                {uploadState && (
+                  <div
+                    className={`upload-status ${uploadState !== 'uploading' ? 'is-error' : ''}`}
+                    role="status"
+                  >
+                    {uploadState === 'uploading' ? 'Enviando imagen…' : uploadState}
+                  </div>
+                )}
               </div>
             )}
             <form className="chat-input" onSubmit={handleSend}>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={handleImagePick}
+            />
+            <button
+              type="button"
+              className="chat-attach"
+              onClick={() => fileRef.current?.click()}
+              disabled={!connected || uploadState === 'uploading'}
+              aria-label="Enviar imagen"
+              title="Enviar imagen"
+            >
+              <ImageIcon />
+            </button>
             <input
               ref={inputRef}
               type="text"
@@ -932,7 +1046,7 @@ export default function Chat() {
                     {displayName(confirmDelete.replyTo.sender)}
                   </span>
                   <span className="msg-reply-content">
-                    {confirmDelete.replyTo.content}
+                    {confirmDelete.replyTo.content || '(imagen)'}
                   </span>
                 </div>
               )}
@@ -944,7 +1058,7 @@ export default function Chat() {
                   {timeLabel(new Date(confirmDelete.createdAt))}
                 </span>
               </div>
-              <div className="msg-content">{confirmDelete.content}</div>
+              <div className="msg-content">{confirmDelete.content || '(imagen)'}</div>
             </div>
           </div>
           <p className="modal-hint">
