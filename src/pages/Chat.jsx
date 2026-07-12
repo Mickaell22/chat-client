@@ -94,9 +94,21 @@ function timeLabel(date) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+// Referencia estable para "sin mensajes": evita que un bucket inexistente
+// cree un array nuevo por render (dispararia el autoscroll de mas).
+const NO_MESSAGES = [];
+
 export default function Chat() {
   const { user, token, signOut } = useAuth();
-  const [messages, setMessages] = useState([]);
+  // Mensajes por conversacion: clave 'global' o 'dm:<userId>'. Cada bucket de
+  // DM se llena con su historial al abrirse y crece con los eventos en vivo.
+  const [buckets, setBuckets] = useState({ global: [] });
+  const [activeKey, setActiveKey] = useState('global');
+  // Conversaciones DM (partner + fecha del ultimo mensaje) para el sidebar.
+  const [convos, setConvos] = useState([]);
+  // No leidos por conversacion. ponytail: solo en memoria, se resetea al
+  // recargar. Upgrade: persistir lastReadAt por conversacion en la DB.
+  const [unread, setUnread] = useState({});
   const [online, setOnline] = useState([]);
   const [connected, setConnected] = useState(false);
   const [text, setText] = useState('');
@@ -118,6 +130,18 @@ export default function Chat() {
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const statusPickerRef = useRef(null);
+  // Espejo de activeKey para los handlers del socket (viven fuera del render).
+  const activeKeyRef = useRef('global');
+
+  useEffect(() => {
+    activeKeyRef.current = activeKey;
+  }, [activeKey]);
+
+  const activeMessages = buckets[activeKey] ?? NO_MESSAGES;
+  // Partner del DM abierto (null si esta abierta la sala global).
+  const activeDmUser = activeKey.startsWith('dm:')
+    ? (convos.find((c) => `dm:${c.user.id}` === activeKey)?.user ?? null)
+    : null;
 
   // Cierra el menu de estado al hacer click afuera.
   useEffect(() => {
@@ -141,10 +165,40 @@ export default function Chat() {
       setMyStatus(saved || 'online');
     };
     const onDisconnect = () => setConnected(false);
-    const onHistory = ({ messages }) => setMessages(messages);
-    const onMessage = (msg) => setMessages((prev) => [...prev, msg]);
+    // Suma un no-leido si el mensaje es de otro y su conversacion no es la
+    // que esta abierta.
+    const bumpUnread = (key, msg) => {
+      if (msg.sender.id === user.id || activeKeyRef.current === key) return;
+      setUnread((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
+    };
+    const onHistory = ({ messages }) =>
+      setBuckets((prev) => ({ ...prev, global: messages }));
+    const onMessage = (msg) => {
+      setBuckets((prev) => ({ ...prev, global: [...prev.global, msg] }));
+      bumpUnread('global', msg);
+    };
+    const onDm = (msg) => {
+      const partner = msg.sender.id === user.id ? msg.recipient : msg.sender;
+      const key = `dm:${partner.id}`;
+      // Solo se agrega si la conversacion ya esta cargada; si no, el historial
+      // la traera completa al abrirla (evita conversaciones a medias).
+      setBuckets((prev) =>
+        key in prev ? { ...prev, [key]: [...prev[key], msg] } : prev,
+      );
+      setConvos((prev) => [
+        { user: partner, lastMessageAt: msg.createdAt },
+        ...prev.filter((c) => c.user.id !== partner.id),
+      ]);
+      bumpUnread(key, msg);
+    };
+    // Borrado (de sala o DM): se quita de todos los buckets, es mas simple
+    // que averiguar en cual vive.
     const onDeleted = ({ id }) => {
-      setMessages((prev) => prev.filter((m) => m.id !== id));
+      setBuckets((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([k, list]) => [k, list.filter((m) => m.id !== id)]),
+        ),
+      );
       // Si estaba respondiendo al mensaje que se borro, cancelar la respuesta.
       setReplyTo((r) => (r && r.id === id ? null : r));
     };
@@ -155,6 +209,9 @@ export default function Chat() {
     socket.on('room:history', onHistory);
     socket.on('room:message', onMessage);
     socket.on('room:message:deleted', onDeleted);
+    socket.on('dm:conversations', setConvos);
+    socket.on('dm:message', onDm);
+    socket.on('dm:message:deleted', onDeleted);
 
     socket.connect();
     return () => {
@@ -164,6 +221,9 @@ export default function Chat() {
       socket.off('room:history', onHistory);
       socket.off('room:message', onMessage);
       socket.off('room:message:deleted', onDeleted);
+      socket.off('dm:conversations', setConvos);
+      socket.off('dm:message', onDm);
+      socket.off('dm:message:deleted', onDeleted);
       socket.disconnect();
     };
     // user.id es un primitivo estable para la sesion (no cambia aunque el
@@ -176,18 +236,46 @@ export default function Chat() {
   useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [activeMessages]);
 
   function handleSend(e) {
     e.preventDefault();
     const content = text.trim();
     if (!content || !connected) return;
-    socketRef.current.emit('room:message', {
-      content,
-      replyToId: replyTo?.id ?? null,
-    });
+    const payload = { content, replyToId: replyTo?.id ?? null };
+    if (activeDmUser) {
+      socketRef.current.emit('dm:message', { ...payload, toUserId: activeDmUser.id });
+    } else {
+      socketRef.current.emit('room:message', payload);
+    }
     setText('');
     setReplyTo(null);
+  }
+
+  // Cambia de conversacion: descarta la respuesta pendiente (era de la otra
+  // conversacion), limpia sus no-leidos y deja el input listo para escribir.
+  function openChat(key) {
+    setActiveKey(key);
+    setReplyTo(null);
+    setUnread((prev) => ({ ...prev, [key]: 0 }));
+    inputRef.current?.focus();
+  }
+
+  function openDm(partner) {
+    const key = `dm:${partner.id}`;
+    // Conversacion nueva (sin mensajes todavia): entra al sidebar igual.
+    setConvos((prev) =>
+      prev.some((c) => c.user.id === partner.id)
+        ? prev
+        : [{ user: partner, lastMessageAt: null }, ...prev],
+    );
+    if (!(key in buckets)) {
+      socketRef.current?.emit('dm:history', { withUserId: partner.id }, (res) => {
+        if (res?.messages) setBuckets((prev) => ({ ...prev, [key]: res.messages }));
+      });
+    }
+    setViewProfileId(null);
+    openChat(key);
   }
 
   function startReply(m) {
@@ -195,22 +283,26 @@ export default function Chat() {
     inputRef.current?.focus();
   }
 
-  function emitDelete(id) {
-    socketRef.current.emit('room:message:delete', { id });
+  // Un mensaje con recipientId es un DM: se borra por el evento de DM.
+  function emitDelete(m) {
+    socketRef.current.emit(
+      m.recipientId ? 'dm:message:delete' : 'room:message:delete',
+      { id: m.id },
+    );
   }
 
   // Click normal abre el modal de confirmacion; Shift+click borra directo
   // (omite la confirmacion), como Discord.
   function handleDelete(m, e) {
     if (e?.shiftKey) {
-      emitDelete(m.id);
+      emitDelete(m);
       return;
     }
     setConfirmDelete(m);
   }
 
   function doDelete() {
-    if (confirmDelete) emitDelete(confirmDelete.id);
+    if (confirmDelete) emitDelete(confirmDelete);
     setConfirmDelete(null);
   }
 
@@ -294,30 +386,75 @@ export default function Chat() {
 
       <div className="chat-body">
         <aside className="chat-online">
-          <h2>En linea ({online.length})</h2>
-          <ul>
-            {online.map((u) => {
-              const isMe = u.id === user?.id;
-              return (
-                <li
-                  key={u.id}
-                  className={isMe ? 'is-me' : 'is-clickable'}
-                  onClick={isMe ? undefined : () => setViewProfileId(u.id)}
-                >
-                  <Avatar user={u} size={28} status={asDotStatus(isMe ? myStatus : u.status)} />
-                  <span className="chat-online-name">
-                    {displayName(u)}
-                    {isMe && ' (tu)'}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          <section>
+            <h2>Canales</h2>
+            <ul>
+              <li
+                className={`is-clickable ${activeKey === 'global' ? 'is-active' : ''}`}
+                onClick={() => openChat('global')}
+              >
+                <span className="side-hash" aria-hidden="true">#</span>
+                <span className="chat-online-name">global</span>
+                {unread.global > 0 && <span className="side-badge">{unread.global}</span>}
+              </li>
+            </ul>
+          </section>
+
+          {convos.length > 0 && (
+            <section>
+              <h2>Mensajes directos</h2>
+              <ul>
+                {convos.map((c) => {
+                  const key = `dm:${c.user.id}`;
+                  const presence = online.find((u) => u.id === c.user.id);
+                  return (
+                    <li
+                      key={c.user.id}
+                      className={`is-clickable ${activeKey === key ? 'is-active' : ''}`}
+                      onClick={() => openDm(c.user)}
+                    >
+                      <Avatar
+                        user={c.user}
+                        size={28}
+                        status={asDotStatus(presence?.status ?? 'offline')}
+                      />
+                      <span className="chat-online-name">{displayName(c.user)}</span>
+                      {unread[key] > 0 && <span className="side-badge">{unread[key]}</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          <section>
+            <h2>En linea ({online.length})</h2>
+            <ul>
+              {online.map((u) => {
+                const isMe = u.id === user?.id;
+                return (
+                  <li
+                    key={u.id}
+                    className={isMe ? 'is-me' : 'is-clickable'}
+                    onClick={isMe ? undefined : () => setViewProfileId(u.id)}
+                  >
+                    <Avatar user={u} size={28} status={asDotStatus(isMe ? myStatus : u.status)} />
+                    <span className="chat-online-name">
+                      {displayName(u)}
+                      {isMe && ' (tu)'}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         </aside>
 
         <section className="chat-channel">
           <header className="channel-header">
-            <span className="channel-name"># global</span>
+            <span className="channel-name">
+              {activeDmUser ? `@${displayName(activeDmUser)}` : '# global'}
+            </span>
             <span
               className={`chat-status ${connected ? 'is-on' : ''}`}
               role="status"
@@ -354,11 +491,15 @@ export default function Chat() {
           )}
 
           <div className="chat-messages" ref={listRef}>
-            {messages.length === 0 && (
-              <p className="chat-empty">Aun no hay mensajes. Escribi el primero.</p>
+            {activeMessages.length === 0 && (
+              <p className="chat-empty">
+                {activeDmUser
+                  ? `Este es el comienzo de tu conversacion con ${displayName(activeDmUser)}.`
+                  : 'Aun no hay mensajes. Escribi el primero.'}
+              </p>
             )}
-            {messages.map((m, i) => {
-              const prev = messages[i - 1];
+            {activeMessages.map((m, i) => {
+              const prev = activeMessages[i - 1];
               const date = new Date(m.createdAt);
               const prevDate = prev ? new Date(prev.createdAt) : null;
               const showDate = !prevDate || !sameDay(date, prevDate);
@@ -465,10 +606,16 @@ export default function Chat() {
                 connected
                   ? replyTo
                     ? `Respondiendo a ${displayName(replyTo.sender)}…`
-                    : 'Escribe un mensaje en # global…'
+                    : activeDmUser
+                      ? `Escribe un mensaje para ${displayName(activeDmUser)}…`
+                      : 'Escribe un mensaje en # global…'
                   : 'Conectando…'
               }
-              aria-label="Mensaje para el canal global"
+              aria-label={
+                activeDmUser
+                  ? `Mensaje para ${displayName(activeDmUser)}`
+                  : 'Mensaje para el canal global'
+              }
               maxLength={2000}
               autoComplete="off"
             />
@@ -543,6 +690,7 @@ export default function Chat() {
           userId={viewProfileId}
           token={token}
           onClose={() => setViewProfileId(null)}
+          onMessage={openDm}
         />
       )}
     </div>

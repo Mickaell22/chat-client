@@ -476,6 +476,41 @@ a:hover {
   overflow-y: auto;
 }
 
+/* El sidebar agrupa secciones: Canales, Mensajes directos y En linea. */
+.chat-online section + section {
+  margin-top: 1.4rem;
+}
+
+/* "#" del canal, alineado con los avatares de 28px de las otras secciones */
+.side-hash {
+  width: 28px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.chat-online li.is-active {
+  background: var(--input-bg);
+}
+
+/* Contador de mensajes no leidos de una conversacion */
+.side-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
 .chat-online h2 {
   margin: 0 0 0.85rem;
   font-size: 0.74rem;
@@ -1258,10 +1293,38 @@ a:hover {
     padding: 0.6rem 1rem;
     overflow-x: auto;
     overflow-y: hidden;
+    /* Las secciones (canales, DM, en linea) fluyen en una sola tira */
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+  }
+
+  .chat-online section {
+    flex-shrink: 0;
+  }
+
+  .chat-online section + section {
+    margin-top: 0;
   }
 
   .chat-online h2 {
     display: none;
+  }
+
+  .side-hash {
+    display: none;
+  }
+
+  /* En la tira los items son columnas: el badge flota sobre el avatar */
+  .chat-online li {
+    position: relative;
+  }
+
+  .side-badge {
+    position: absolute;
+    top: -0.3rem;
+    right: -0.1rem;
+    margin-left: 0;
   }
 
   .chat-online ul {
@@ -1396,6 +1459,16 @@ a:hover {
 
 .btn-danger:hover {
   filter: brightness(1.08);
+}
+
+.btn-primary {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn-primary:hover {
+  filter: brightness(0.92);
 }
 
 @keyframes overlay-in {

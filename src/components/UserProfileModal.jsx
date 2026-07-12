@@ -16,7 +16,9 @@ function memberSince(createdAt) {
 // click en un usuario del sidebar de "en linea". El padre lo monta con
 // key={userId}, asi que cada usuario nuevo arranca con estado limpio (sin
 // necesidad de resetear profile/error a mano en el effect).
-export default function UserProfileModal({ userId, token, onClose }) {
+// onMessage es opcional: si viene, se muestra "Enviar mensaje" (abre el DM
+// con este usuario; el padre decide que hacer).
+export default function UserProfileModal({ userId, token, onClose, onMessage }) {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
 
@@ -60,6 +62,11 @@ export default function UserProfileModal({ userId, token, onClose }) {
             <button type="button" className="btn-ghost" onClick={onClose}>
               Cerrar
             </button>
+            {onMessage && (
+              <button type="button" className="btn-primary" onClick={() => onMessage(profile)}>
+                Enviar mensaje
+              </button>
+            )}
           </div>
         </>
       )}
