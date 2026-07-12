@@ -1706,6 +1706,43 @@ a:hover {
   color: var(--on-accent);
 }
 
+/* Etiqueta "Ya son amigos" en el modal de perfil: informativa, a la
+   izquierda de los botones */
+.profile-friends-label {
+  align-self: center;
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+/* Avatar del perfil clickeable para ver la foto en grande */
+.profile-photo-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  border-radius: 50%;
+  cursor: zoom-in;
+}
+
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg-1) 82%, transparent);
+  cursor: zoom-out;
+}
+
+.photo-lightbox img {
+  width: min(420px, 82vw);
+  height: auto;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+}
+
 .btn-primary:hover {
   filter: brightness(0.92);
 }
