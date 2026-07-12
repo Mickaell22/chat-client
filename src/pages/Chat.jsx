@@ -7,6 +7,7 @@ import { compressImage } from '../lib/compressImage.js';
 import { ensureNotifyPermission, showNotification, beep } from '../lib/notify.js';
 import { displayName } from '../lib/displayName.js';
 import { asDotStatus } from '../lib/presence.js';
+import { REACTION_EMOJIS } from '../lib/reactions.js';
 import Avatar from '../components/Avatar.jsx';
 import Modal from '../components/Modal.jsx';
 import UserProfileModal from '../components/UserProfileModal.jsx';
@@ -86,6 +87,17 @@ function ImageIcon() {
       <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
       <circle cx="9" cy="9" r="2" />
       <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </svg>
+  );
+}
+
+function SmileIcon() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      <line x1="9" x2="9.01" y1="9" y2="9" />
+      <line x1="15" x2="15.01" y1="9" y2="9" />
     </svg>
   );
 }
@@ -199,6 +211,8 @@ export default function Chat() {
   const [replyTo, setReplyTo] = useState(null);
   // Mensaje propio en edicion (null = no se esta editando).
   const [editing, setEditing] = useState(null);
+  // Id del mensaje cuyo picker de reacciones esta abierto (null = ninguno).
+  const [reactingTo, setReactingTo] = useState(null);
   // Mensaje pendiente de confirmar borrado (null = modal cerrado).
   const [confirmDelete, setConfirmDelete] = useState(null);
   // Id del usuario cuyo perfil se esta mirando (null = modal cerrado).
@@ -287,6 +301,14 @@ export default function Chat() {
   // Llamadas de voz 1-a-1 (WebRTC). Reusa el mismo socket singleton que el chat.
   const callSocket = useMemo(() => getSocket(token), [token]);
   const call = useCall(callSocket);
+
+  // Cierra el picker de reacciones al hacer click en cualquier otro lado.
+  useEffect(() => {
+    if (!reactingTo) return;
+    const onClick = () => setReactingTo(null);
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, [reactingTo]);
 
   // Cierra el menu de estado al hacer click afuera.
   useEffect(() => {
@@ -392,6 +414,17 @@ export default function Chat() {
         });
       }
     };
+    // Reacciones actualizadas de un mensaje, este en el bucket que este.
+    const onReactions = ({ id, reactions }) => {
+      setBuckets((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([k, list]) => [
+            k,
+            list.map((m) => (m.id === id ? { ...m, reactions } : m)),
+          ]),
+        ),
+      );
+    };
     // Edicion (de sala o DM): se actualiza el mensaje este donde este.
     const onEdited = ({ id, content, editedAt }) => {
       setBuckets((prev) =>
@@ -426,6 +459,7 @@ export default function Chat() {
     socket.on('dm:message:deleted', onDeleted);
     socket.on('room:message:edited', onEdited);
     socket.on('dm:message:edited', onEdited);
+    socket.on('message:reactions', onReactions);
     socket.on('rooms:list', setRooms);
     socket.on('room:created', onRoomCreated);
     socket.on('typing:start', onTypingStart);
@@ -444,6 +478,7 @@ export default function Chat() {
       socket.off('dm:message:deleted', onDeleted);
       socket.off('room:message:edited', onEdited);
       socket.off('dm:message:edited', onEdited);
+      socket.off('message:reactions', onReactions);
       socket.off('rooms:list', setRooms);
       socket.off('room:created', onRoomCreated);
       socket.off('typing:start', onTypingStart);
@@ -671,6 +706,10 @@ export default function Chat() {
     setNotifyOn(next);
     localStorage.setItem(`pub.notify.${user.id}`, next ? '1' : '0');
     if (next) await ensureNotifyPermission();
+  }
+
+  function toggleReaction(m, emoji) {
+    socketRef.current?.emit('message:react', { id: m.id, emoji });
   }
 
   function startReply(m) {
@@ -1068,8 +1107,53 @@ export default function Chat() {
                           </div>
                         )
                       )}
+                      {m.reactions?.length > 0 && (
+                        <div className="msg-reactions">
+                          {m.reactions.map((r) => (
+                            <button
+                              key={r.emoji}
+                              type="button"
+                              className={`msg-reaction ${
+                                r.userIds.includes(user.id) ? 'is-mine' : ''
+                              }`}
+                              onClick={() => toggleReaction(m, r.emoji)}
+                              aria-label={`Reaccion ${r.emoji}: ${r.userIds.length}`}
+                            >
+                              <span aria-hidden="true">{r.emoji}</span>
+                              {r.userIds.length}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                    {reactingTo === m.id && (
+                      <div className="reaction-picker" onClick={(e) => e.stopPropagation()}>
+                        {REACTION_EMOJIS.map((e) => (
+                          <button
+                            key={e}
+                            type="button"
+                            onClick={() => {
+                              toggleReaction(m, e);
+                              setReactingTo(null);
+                            }}
+                            aria-label={`Reaccionar con ${e}`}
+                          >
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <div className="msg-actions">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReactingTo((cur) => (cur === m.id ? null : m.id));
+                        }}
+                        aria-label="Reaccionar"
+                      >
+                        <SmileIcon />
+                      </button>
                       <button
                         type="button"
                         onClick={() => startReply(m)}
