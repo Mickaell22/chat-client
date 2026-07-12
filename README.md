@@ -65,8 +65,14 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 - **Estado de presencia** tipo Discord (conectado / no molestar / invisible).
 - **Mensajería en tiempo real** mediante WebSockets (socket.io-client).
 - **Lista de usuarios conectados** actualizada en vivo, con avatares.
-- **Salas de chat múltiples**: crear, unirse y salir.
-- **Mensajes privados** (DM) entre usuarios.
+- **Salas de chat múltiples**: crear, unirse y salir, con salas **privadas**
+  a las que solo se entra con código de invitación (la invitación se envía
+  por DM como tarjeta con botón "Unirse").
+- **Mensajes privados** (DM) entre usuarios, con contador de no leídos.
+- **Indicador de "escribiendo"** en salas y DM.
+- **Envío de imágenes** comprimidas en el navegador (canvas, lado máximo
+  1600px) antes de subirse; opcionalmente con texto como caption.
+- Responder y eliminar mensajes (estilo Discord) en salas y DM.
 - Historial de mensajes al abrir una conversación.
 - Rutas protegidas: sin sesión válida no se accede al chat.
 

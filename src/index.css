@@ -603,21 +603,79 @@ a:hover {
   margin: 1rem 1.35rem 0;
 }
 
-/* Indicador de "escribiendo": flota sobre el input para no mover el layout */
+/* Avisos que flotan sobre el input sin mover el layout: "escribiendo" y el
+   estado del envio de imagenes. */
 .chat-input-area {
   position: relative;
 }
 
-.typing-indicator {
+.input-overlays {
   position: absolute;
   bottom: 100%;
   left: 1.35rem;
   right: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--bg-1), transparent);
+}
+
+.typing-indicator,
+.upload-status {
   padding: 0.2rem 0;
   font-size: 0.78rem;
   color: var(--text-muted);
-  pointer-events: none;
-  background: linear-gradient(to top, var(--bg-1), transparent);
+}
+
+.upload-status.is-error {
+  color: var(--error);
+}
+
+/* Boton de adjuntar imagen, a la izquierda del input */
+.chat-input .chat-attach {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  padding: 0;
+  border: 1px solid var(--card-border);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.chat-input .chat-attach:hover:not(:disabled) {
+  background: var(--input-bg);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.chat-input .chat-attach:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chat-input .chat-attach svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Imagen adjunta en un mensaje */
+.msg-image-link {
+  display: inline-block;
+  margin-top: 0.2rem;
+}
+
+.msg-image {
+  display: block;
+  max-width: min(360px, 100%);
+  max-height: 320px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
 }
 
 /* Boton "Invitar" de la cabecera de una sala */
