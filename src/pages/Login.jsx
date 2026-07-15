@@ -32,7 +32,7 @@ export default function Login() {
     <div className="auth-card">
       <Brand />
       <h1>Iniciar sesion</h1>
-      <p className="auth-subtitle">Entra para chatear en tiempo real.</p>
+      <p className="auth-subtitle">Bienvenido de nuevo. Entra para chatear en tiempo real.</p>
       {notice && (
         <p className="auth-success" role="status">
           {notice}
