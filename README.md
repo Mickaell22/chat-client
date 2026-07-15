@@ -13,6 +13,7 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 ![Socket.IO](https://img.shields.io/badge/Socket.IO--client-4-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2023-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![Railway](https://img.shields.io/badge/Railway-Deploy-0B0D0E?style=for-the-badge&logo=railway&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 
 </div>
 
@@ -31,6 +32,7 @@ WebSockets al backend para enviar y recibir mensajes al instante.
 - [Ejecución](#ejecución)
 - [Build de producción](#build-de-producción)
 - [Despliegue en Railway](#despliegue-en-railway)
+- [CI/CD](#cicd)
 - [Backend](#backend)
 
 ---
@@ -217,7 +219,8 @@ npm run preview  # sirve el build localmente para probarlo
 ## Despliegue en Railway
 
 Desplegado en el proyecto **chat-tiempo-real**, servicio **chat-client**
-(linkeado al repo de GitHub: cada push a `main` dispara redeploy automático):
+(el despliegue lo orquesta GitHub Actions: cada push a `main` corre lint y
+build y, si pasan, despliega — ver [CI/CD](#cicd)):
 
 **https://chat-client-production-4b10.up.railway.app**
 
@@ -231,6 +234,41 @@ Pasos seguidos:
    build` + sin script `start`) y sirve la carpeta `dist/` con Caddy — no hace
    falta configurar un servidor propio.
 4. Dominio público generado con `railway domain`.
+
+---
+
+## CI/CD
+
+[![CI/CD chat-client](https://github.com/Mickaell22/chat-client/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Mickaell22/chat-client/actions/workflows/ci-cd.yml)
+
+El proyecto tiene dos flujos de integración y despliegue continuo:
+
+### GitHub Actions (`.github/workflows/ci-cd.yml`)
+
+Pipeline de tres etapas encadenadas:
+
+1. **Lint y build** — en cada push y PR a `main`: `npm ci`, `npm run lint`
+   y `npm run build` con las URLs reales del backend; el `dist/` se guarda
+   como artefacto del run.
+2. **Deploy a Railway** — solo en push a `main` y si el build pasa:
+   `railway up --service chat-client` con la CLI oficial de Railway.
+3. **Verificación post-deploy** — `curl` con reintentos a la URL pública
+   del sitio; el pipeline falla si no responde.
+
+Configuración requerida en GitHub (Settings del repo):
+
+| Tipo | Nombre | Contenido |
+| --- | --- | --- |
+| Secret (Actions) | `RAILWAY_TOKEN` | Token de proyecto de Railway |
+| Variable (Actions) | `VITE_API_URL` | URL pública del backend (HTTP) |
+| Variable (Actions) | `VITE_SOCKET_URL` | URL pública del backend (WebSocket) |
+| Variable (Actions) | `HEALTHCHECK_URL` | URL pública del cliente |
+
+### Jenkins (rama `ci/docker-jenkins`)
+
+Flujo alternativo autoalojado sobre Docker: esta rama aporta el `Dockerfile`
+(build de Vite + nginx) que consume el `Jenkinsfile` del repo `chat-server`,
+con staging, aprobación manual y producción.
 
 ---
 

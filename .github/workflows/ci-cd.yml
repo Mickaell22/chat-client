@@ -1,0 +1,88 @@
+# Flujo CI/CD del frontend (chat-client).
+# CI: en cada push/PR a main corre lint y build de Vite (valida que compile
+#     con las URLs reales del backend) y guarda el dist como artefacto.
+# CD: si es push a main y el build pasa, despliega a Railway y verifica
+#     que el sitio en produccion responda.
+#
+# Requiere configurar en GitHub (Settings del repo):
+#   - Secret  RAILWAY_TOKEN     -> token de proyecto de Railway (project token)
+#   - Variable VITE_API_URL     -> URL publica del backend (HTTP)
+#   - Variable VITE_SOCKET_URL  -> URL publica del backend (WebSocket)
+#   - Variable HEALTHCHECK_URL  -> URL publica del cliente en produccion
+
+name: CI/CD chat-client
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint y build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build de produccion
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_SOCKET_URL: ${{ vars.VITE_SOCKET_URL }}
+
+      - name: Guardar dist como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-client-dist
+          path: dist
+
+  deploy:
+    name: Deploy a Railway
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.HEALTHCHECK_URL }}
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Desplegar servicio chat-client
+        run: railway up --service chat-client --ci
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  healthcheck:
+    name: Verificacion post-deploy
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Esperar respuesta del sitio
+        run: |
+          curl --fail --silent --show-error --output /dev/null \
+            --retry 12 --retry-delay 10 --retry-all-errors \
+            "${{ vars.HEALTHCHECK_URL }}"
+          echo "Cliente en produccion respondiendo OK"
